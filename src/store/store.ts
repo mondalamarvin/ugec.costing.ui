@@ -1,0 +1,17 @@
+import { configureStore } from "@reduxjs/toolkit";
+
+import costingSlice from "./slices/costingSlice";
+import formulaSlice from "./slices/formulaSlice";
+import materialSlice from "./slices/materialSlice";
+
+const store = configureStore({
+  reducer: {
+    costing: costingSlice,
+    formula: formulaSlice,
+    material: materialSlice,
+  },
+});
+
+export default store;
+export type RootState = ReturnType<typeof store.getState>;
+export type AppDispatch = typeof store.dispatch;
