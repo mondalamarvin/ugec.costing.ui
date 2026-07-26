@@ -36,6 +36,7 @@ export interface ICostingRequest {
   repeatLength: number;
   pcsPerBox: number;
   noOfColor: number;
+  vehicle: string;
   processRoute: IProcessRoute[];
   layers: ILayers[];
 }
