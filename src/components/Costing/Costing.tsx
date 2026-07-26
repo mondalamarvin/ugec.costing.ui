@@ -1,15 +1,15 @@
-import { useState, useEffect, useCallback } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import Select from "react-select";
-import classNames from "classnames";
-import type { AppDispatch } from "../../store/store";
-import { ChevronRight } from "lucide-react";
+import { useState, useEffect, useCallback } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import Select from 'react-select';
+import classNames from 'classnames';
+import type { AppDispatch } from '../../store/store';
+import { ChevronRight } from 'lucide-react';
 import {
   setSingleSelectState,
   setMultiSelectState,
   customErrorStyle,
   setInputState,
-} from "../../lib";
+} from '../../lib';
 import {
   Button,
   Card,
@@ -30,11 +30,11 @@ import {
   Progress,
   Badge,
   CardAction,
-} from "../ui";
+} from '../ui';
 import {
   generateCostingRequest,
   selectCostingLoading,
-} from "../../store/slices/costingSlice";
+} from '../../store/slices/costingSlice';
 import {
   fetchMaterialCategories,
   fetchMaterialsByCategory,
@@ -42,7 +42,7 @@ import {
   selectMaterialLoading,
   selectMaterials,
   selectCategories,
-} from "../../store/slices/materialSlice";
+} from '../../store/slices/materialSlice';
 import {
   fetchFormulas,
   selectFormulas,
@@ -50,7 +50,7 @@ import {
   selectFormulaLoading,
   resetFormulas,
   fetchFormulaById,
-} from "../../store/slices/formulaSlice";
+} from '../../store/slices/formulaSlice';
 import type {
   ICostingRequest,
   IInputErrors,
@@ -58,9 +58,9 @@ import type {
   IFormula,
   IMaterial,
   ILayers,
-} from "../../global/interfaces";
+} from '../../global/interfaces';
 
-const orderTypeOptions = [{ value: "Conesleeves", label: "Conesleeves" }];
+const orderTypeOptions = [{ value: 'Conesleeves', label: 'Conesleeves' }];
 
 // const categoryTypeOptions = [
 //   { value: 1, label: "Adhesive" },
@@ -69,11 +69,11 @@ const orderTypeOptions = [{ value: "Conesleeves", label: "Conesleeves" }];
 // ];
 
 const machineOptions = [
-  { value: 1, label: "Bobst CL750 D1350/450 Laminating Machine (without LPG)" },
-  { value: 2, label: "New Web Control Jumbo (Rewinding)" },
-  { value: 3, label: "Rotopak 888 1200/300C" },
-  { value: 4, label: "Automatic Punching" },
-  { value: 5, label: "Dayuan" },
+  { value: 1, label: 'Bobst CL750 D1350/450 Laminating Machine (without LPG)' },
+  { value: 2, label: 'New Web Control Jumbo (Rewinding)' },
+  { value: 3, label: 'Rotopak 888 1200/300C' },
+  { value: 4, label: 'Automatic Punching' },
+  { value: 5, label: 'Dayuan' },
 ];
 
 // const layerOptions = [
@@ -125,7 +125,7 @@ export const Costing = () => {
   const [noOfUps, setNoOfUps] = useState<number>(0);
   const [openAddLayerSheet, setOpenAddLayerSheet] = useState<boolean>(false);
   const [openSheet, setOpenSheet] = useState<boolean>(false);
-  const [orderType, setOrderType] = useState<string>("");
+  const [orderType, setOrderType] = useState<string>('');
   const [pcsPerBox, setPcsPerBox] = useState<number>(0);
   const [processRoute, setProcessRoute] = useState<readonly ISelect[]>([]);
   const [quantityOrder, setQuantityOrder] = useState<number>(0);
@@ -217,8 +217,9 @@ export const Costing = () => {
       noOfColor: noOfColors,
       processRoute: mapToProcessRoute(processRoute),
       layers: layerOptions,
+      vehicle: 'L300',
     };
-    console.log("[[Data]]", data);
+    console.log('[[Data]]', data);
     dispatch(generateCostingRequest(data));
   };
 
@@ -226,7 +227,7 @@ export const Costing = () => {
     // Extract just the category string, fallback to empty string or default if not found
     const typeString =
       categoryOptions.find((c: ICategoryOption) => c.value === layerType)
-        ?.category ?? "";
+        ?.category ?? '';
 
     const layerOrder = layerOptions.length;
     const isInk = layerType === 3;
@@ -302,40 +303,40 @@ export const Costing = () => {
             </SheetDescription>
           </SheetHeader>
           <Container>
-            <div className="grid gap-6 mb-4 lg:grid-cols-0">
+            <div className='grid gap-6 mb-4 lg:grid-cols-0'>
               <div>
                 <label
-                  htmlFor="layerType"
+                  htmlFor='layerType'
                   className={classNames(
-                    "block mb-2 text-sm font-medium",
-                    errors.layerType ? "text-red-600" : "text-gray-900",
+                    'block mb-2 text-sm font-medium',
+                    errors.layerType ? 'text-red-600' : 'text-gray-900',
                   )}
                 >
                   Type
                 </label>
                 <Select<ISelect>
-                  id="layerType"
+                  id='layerType'
                   options={categoryOptions}
                   onChange={(type) => {
                     setSingleSelectState(
                       setLayerType,
                       setErrors,
-                      "layerType",
+                      'layerType',
                       type,
                     );
                   }}
-                  styles={customErrorStyle("layerType", errors.layerType)}
+                  styles={customErrorStyle('layerType', errors.layerType)}
                 />
               </div>
             </div>
             {layerType !== 3 && layerType !== null && (
-              <div className="grid gap-6 mb-4 lg:grid-cols-0">
+              <div className='grid gap-6 mb-4 lg:grid-cols-0'>
                 <div>
                   <label
-                    htmlFor="selectedMaterial"
+                    htmlFor='selectedMaterial'
                     className={classNames(
-                      "block mb-2 text-sm font-medium",
-                      errors.orderType ? "text-red-600" : "text-gray-900",
+                      'block mb-2 text-sm font-medium',
+                      errors.orderType ? 'text-red-600' : 'text-gray-900',
                     )}
                   >
                     Material
@@ -343,19 +344,19 @@ export const Costing = () => {
                   <Select<ISelect>
                     isLoading={loadingMaterials}
                     isDisabled={loadingMaterials}
-                    id="selectedMaterial"
+                    id='selectedMaterial'
                     options={materialOptions}
                     onChange={(item) => {
                       selectMaterialChangeHandler(item);
                       setSingleSelectState(
                         setSelectedMaterial,
                         setErrors,
-                        "selectedMaterial",
+                        'selectedMaterial',
                         item,
                       );
                     }}
                     styles={customErrorStyle(
-                      "selectedMaterial",
+                      'selectedMaterial',
                       errors.selectedMaterial,
                     )}
                   />
@@ -363,19 +364,19 @@ export const Costing = () => {
               </div>
             )}
             {layerType === 3 && layerType !== null && (
-              <div className="grid gap-6 mb-4 lg:grid-cols-0">
+              <div className='grid gap-6 mb-4 lg:grid-cols-0'>
                 <div>
                   <label
-                    htmlFor="selectedFormula"
+                    htmlFor='selectedFormula'
                     className={classNames(
-                      "block mb-2 text-sm font-medium",
-                      errors.orderType ? "text-red-600" : "text-gray-900",
+                      'block mb-2 text-sm font-medium',
+                      errors.orderType ? 'text-red-600' : 'text-gray-900',
                     )}
                   >
                     Formula
                   </label>
                   <Select<ISelect>
-                    id="selectedFormula"
+                    id='selectedFormula'
                     isLoading={loadingFormulas}
                     isDisabled={loadingFormulas}
                     options={formulaOptions}
@@ -384,12 +385,12 @@ export const Costing = () => {
                       setSingleSelectState(
                         setSelectedFormula,
                         setErrors,
-                        "selectedFormula",
+                        'selectedFormula',
                         formula,
                       );
                     }}
                     styles={customErrorStyle(
-                      "selectedFormula",
+                      'selectedFormula',
                       errors.selectedFormula,
                     )}
                   />
@@ -398,38 +399,38 @@ export const Costing = () => {
             )}
             {layerType === 3 && layerType !== null && inkDetails !== null && (
               <>
-                <div className="grid grid-cols-2">
-                  <div className="flex flex-col">
+                <div className='grid grid-cols-2'>
+                  <div className='flex flex-col'>
                     <span>Coverage (%)</span>
                     <b>{inkDetails?.printCoverage}%</b>
                   </div>
-                  <div className="flex flex-col">
+                  <div className='flex flex-col'>
                     <span>TNVC (%)</span>
                     <b>{inkDetails?.tnvc}%</b>
                   </div>
                 </div>
                 <hr />
-                <div className="grid grid-cols-1 py-4">
-                  <div className="flex">
+                <div className='grid grid-cols-1 py-4'>
+                  <div className='flex'>
                     <b>Components: </b>
-                    <Badge className="ml-2" variant="default">
+                    <Badge className='ml-2' variant='default'>
                       {selectedFormulaDetails?.components.length}
                     </Badge>
                   </div>
-                  <span className="text-xs">
+                  <span className='text-xs'>
                     The formula contains the following components
                   </span>
                 </div>
-                <div className="max-h-64 overflow-y-auto">
+                <div className='max-h-64 overflow-y-auto'>
                   {selectedFormulaDetails &&
                     selectedFormulaDetails.components.map(
                       (detail: any, index: number) => (
-                        <Card className="rounded-xs py-1.5" key={index}>
-                          <CardContent className="grd grid-cols-2">
-                            <div className="flex">{detail.material.name}</div>
-                            <div className="flex font-bold">
+                        <Card className='rounded-xs py-1.5' key={index}>
+                          <CardContent className='grd grid-cols-2'>
+                            <div className='flex'>{detail.material.name}</div>
+                            <div className='flex font-bold'>
                               <span>Mixing Ratio:</span>
-                              <p className="px-2">{detail.mixingRatio}%</p>
+                              <p className='px-2'>{detail.mixingRatio}%</p>
                             </div>
                           </CardContent>
                         </Card>
@@ -438,10 +439,10 @@ export const Costing = () => {
                 </div>
               </>
             )}
-            <div className="py-4">
+            <div className='py-4'>
               <Button
-                type="button"
-                className="py-4"
+                type='button'
+                className='py-4'
                 onClick={() => addLayerClickHandler()}
               >
                 Add To Layer
@@ -457,43 +458,43 @@ export const Costing = () => {
           </CardHeader>
           <CardContent>
             <Form onSubmit={submitCostingHandler}>
-              <div className="grid gap-6 mb-4 lg:grid-cols-2">
+              <div className='grid gap-6 mb-4 lg:grid-cols-2'>
                 <div>
                   <label
-                    htmlFor="orderType"
+                    htmlFor='orderType'
                     className={classNames(
-                      "block mb-2 text-sm font-medium",
-                      errors.orderType ? "text-red-600" : "text-gray-900",
+                      'block mb-2 text-sm font-medium',
+                      errors.orderType ? 'text-red-600' : 'text-gray-900',
                     )}
                   >
                     Order Type
                   </label>
                   <Select<ISelect>
-                    id="orderType"
+                    id='orderType'
                     options={orderTypeOptions}
                     onChange={(order) =>
                       setSingleSelectState(
                         setOrderType,
                         setErrors,
-                        "orderType",
+                        'orderType',
                         order,
                       )
                     }
-                    styles={customErrorStyle("orderType", errors.orderType)}
+                    styles={customErrorStyle('orderType', errors.orderType)}
                   />
                 </div>
-                <div className="flex-1">
+                <div className='flex-1'>
                   <Field data-invalid={errors && errors.quantityOrder}>
-                    <FieldLabel htmlFor="quantityOrder">Quantity</FieldLabel>
+                    <FieldLabel htmlFor='quantityOrder'>Quantity</FieldLabel>
                     <Input
-                      name="quantityOrder"
-                      type="number"
+                      name='quantityOrder'
+                      type='number'
                       onChange={(e) =>
                         setInputState(
                           e,
                           setQuantityOrder,
                           setErrors,
-                          "quantityOrder",
+                          'quantityOrder',
                         )
                       }
                       value={quantityOrder}
@@ -502,19 +503,19 @@ export const Costing = () => {
                   </Field>
                 </div>
               </div>
-              <div className="grid gap-6 mb-4 lg:grid-cols-2">
+              <div className='grid gap-6 mb-4 lg:grid-cols-2'>
                 <div>
                   <Field data-invalid={errors && errors.spreadWidth}>
-                    <FieldLabel htmlFor="spreadWidth">Spread Width</FieldLabel>
+                    <FieldLabel htmlFor='spreadWidth'>Spread Width</FieldLabel>
                     <Input
-                      name="spreadWidth"
-                      type="number"
+                      name='spreadWidth'
+                      type='number'
                       onChange={(e) =>
                         setInputState(
                           e,
                           setSpreadWidth,
                           setErrors,
-                          "spreadWidth",
+                          'spreadWidth',
                         )
                       }
                       value={spreadWidth}
@@ -524,18 +525,18 @@ export const Costing = () => {
                 </div>
                 <div>
                   <Field data-invalid={errors && errors.spreadHeight}>
-                    <FieldLabel htmlFor="spreadHeigth">
+                    <FieldLabel htmlFor='spreadHeigth'>
                       Spread Height
                     </FieldLabel>
                     <Input
-                      name="spreadHeight"
-                      type="number"
+                      name='spreadHeight'
+                      type='number'
                       onChange={(e) =>
                         setInputState(
                           e,
                           setSpreadHeight,
                           setErrors,
-                          "spreadHeight",
+                          'spreadHeight',
                         )
                       }
                       value={spreadHeight}
@@ -544,15 +545,15 @@ export const Costing = () => {
                   </Field>
                 </div>
               </div>
-              <div className="grid gap-6 mb-4 lg:grid-cols-2">
+              <div className='grid gap-6 mb-4 lg:grid-cols-2'>
                 <div>
                   <Field data-invalid={errors && errors.noOfUps}>
-                    <FieldLabel htmlFor="noOfUps">Number Of Ups</FieldLabel>
+                    <FieldLabel htmlFor='noOfUps'>Number Of Ups</FieldLabel>
                     <Input
-                      name="noOfUps"
-                      type="number"
+                      name='noOfUps'
+                      type='number'
                       onChange={(e) =>
-                        setInputState(e, setNoOfUps, setErrors, "noOfUps")
+                        setInputState(e, setNoOfUps, setErrors, 'noOfUps')
                       }
                       value={noOfUps}
                       aria-invalid={errors && errors.noOfUps}
@@ -561,12 +562,12 @@ export const Costing = () => {
                 </div>
                 <div>
                   <Field data-invalid={errors && errors.noOfOuts}>
-                    <FieldLabel htmlFor="noOfOuts">Number Of Outs</FieldLabel>
+                    <FieldLabel htmlFor='noOfOuts'>Number Of Outs</FieldLabel>
                     <Input
-                      name="noOfOuts"
-                      type="number"
+                      name='noOfOuts'
+                      type='number'
                       onChange={(e) =>
-                        setInputState(e, setNoOfOuts, setErrors, "noOfOuts")
+                        setInputState(e, setNoOfOuts, setErrors, 'noOfOuts')
                       }
                       value={noOfOuts}
                       aria-invalid={errors && errors.noOfOuts}
@@ -574,19 +575,19 @@ export const Costing = () => {
                   </Field>
                 </div>
               </div>
-              <div className="grid gap-6 mb-4 lg:grid-cols-2">
+              <div className='grid gap-6 mb-4 lg:grid-cols-2'>
                 <div>
                   <Field data-invalid={errors && errors.totalImages}>
-                    <FieldLabel htmlFor="totalImages">Total Images</FieldLabel>
+                    <FieldLabel htmlFor='totalImages'>Total Images</FieldLabel>
                     <Input
-                      name="totalImages"
-                      type="number"
+                      name='totalImages'
+                      type='number'
                       onChange={(e) =>
                         setInputState(
                           e,
                           setTotalImages,
                           setErrors,
-                          "totalImages",
+                          'totalImages',
                         )
                       }
                       value={totalImages}
@@ -596,18 +597,18 @@ export const Costing = () => {
                 </div>
                 <div>
                   <Field data-invalid={errors && errors.netRollWidth}>
-                    <FieldLabel htmlFor="netRollWidth">
+                    <FieldLabel htmlFor='netRollWidth'>
                       Net Roll Width
                     </FieldLabel>
                     <Input
-                      name="netRollWidth"
-                      type="number"
+                      name='netRollWidth'
+                      type='number'
                       onChange={(e) =>
                         setInputState(
                           e,
                           setNetRollWidth,
                           setErrors,
-                          "netRollWidth",
+                          'netRollWidth',
                         )
                       }
                       value={netRollWidth}
@@ -616,21 +617,21 @@ export const Costing = () => {
                   </Field>
                 </div>
               </div>
-              <div className="grid gap-6 mb-4 lg:grid-cols-3">
+              <div className='grid gap-6 mb-4 lg:grid-cols-3'>
                 <div>
                   <Field data-invalid={errors && errors.repeatLength}>
-                    <FieldLabel htmlFor="repeatLength">
+                    <FieldLabel htmlFor='repeatLength'>
                       Repeat Length
                     </FieldLabel>
                     <Input
-                      name="repeatLength"
-                      type="number"
+                      name='repeatLength'
+                      type='number'
                       onChange={(e) =>
                         setInputState(
                           e,
                           setRepeatLength,
                           setErrors,
-                          "repeatLength",
+                          'repeatLength',
                         )
                       }
                       value={repeatLength}
@@ -640,14 +641,14 @@ export const Costing = () => {
                 </div>
                 <div>
                   <Field data-invalid={errors && errors.pcsPerBox}>
-                    <FieldLabel htmlFor="spreadHeigth">
+                    <FieldLabel htmlFor='spreadHeigth'>
                       Pieces Per Box
                     </FieldLabel>
                     <Input
-                      name="pcsPerBox"
-                      type="number"
+                      name='pcsPerBox'
+                      type='number'
                       onChange={(e) =>
-                        setInputState(e, setPcsPerBox, setErrors, "pcsPerBox")
+                        setInputState(e, setPcsPerBox, setErrors, 'pcsPerBox')
                       }
                       value={pcsPerBox}
                       aria-invalid={errors && errors.pcsPerBox}
@@ -656,14 +657,14 @@ export const Costing = () => {
                 </div>
                 <div>
                   <Field data-invalid={errors && errors.noOfColors}>
-                    <FieldLabel htmlFor="noOfColors">
+                    <FieldLabel htmlFor='noOfColors'>
                       Number Of Colors
                     </FieldLabel>
                     <Input
-                      name="noOfColors"
-                      type="number"
+                      name='noOfColors'
+                      type='number'
                       onChange={(e) =>
-                        setInputState(e, setNoOfColors, setErrors, "noOfColors")
+                        setInputState(e, setNoOfColors, setErrors, 'noOfColors')
                       }
                       value={noOfColors}
                       aria-invalid={errors && errors.noOfColors}
@@ -671,19 +672,19 @@ export const Costing = () => {
                   </Field>
                 </div>
               </div>
-              <div className="grid gap-6 mb-4 lg:grid-cols-0">
+              <div className='grid gap-6 mb-4 lg:grid-cols-0'>
                 <div>
                   <label
-                    htmlFor="processRoute"
+                    htmlFor='processRoute'
                     className={classNames(
-                      "block mb-2 text-sm font-medium",
-                      errors.processRoute ? "text-red-600" : "text-gray-900",
+                      'block mb-2 text-sm font-medium',
+                      errors.processRoute ? 'text-red-600' : 'text-gray-900',
                     )}
                   >
                     Machines
                   </label>
                   <Select<ISelect, true>
-                    id="processRoute"
+                    id='processRoute'
                     isMulti
                     options={machineOptions}
                     value={processRoute}
@@ -691,12 +692,12 @@ export const Costing = () => {
                       setMultiSelectState(
                         setProcessRoute,
                         setErrors,
-                        "processRoute",
+                        'processRoute',
                         value,
                       )
                     }
                     styles={customErrorStyle(
-                      "processRoute",
+                      'processRoute',
                       errors.processRoute,
                     )}
                   />
@@ -710,13 +711,13 @@ export const Costing = () => {
                 <div>Layer</div>
               </div>
             )} */}
-              <div className="grid gap-0">
+              <div className='grid gap-0'>
                 {layerOptions.map((layer, index) => {
                   return (
-                    <Card className="rounded-sm" key={index}>
-                      <CardContent className="p-2">
-                        <div className="grid gap-3 lg:grid-cols-[2fr_1fr_2fr_1fr_auto] items-center">
-                          <div className="lg:pl-8">
+                    <Card className='rounded-sm' key={index}>
+                      <CardContent className='p-2'>
+                        <div className='grid gap-3 lg:grid-cols-[2fr_1fr_2fr_1fr_auto] items-center'>
+                          <div className='lg:pl-8'>
                             {layer.type}
                             <br />
                             {layer.name}
@@ -731,7 +732,7 @@ export const Costing = () => {
                           <div>{layer.tnvc}%</div>
                           <div>
                             <ChevronRight
-                              className="h-4 w-4"
+                              className='h-4 w-4'
                               onClick={() => {
                                 setSelectedLayerIndex(index);
                                 setOpenSheet(true);
@@ -743,10 +744,10 @@ export const Costing = () => {
                     </Card>
                   );
                 })}
-                <div className="py-4">
+                <div className='py-4'>
                   <Button
-                    type="button"
-                    className="py-4"
+                    type='button'
+                    className='py-4'
                     onClick={() => {
                       setSelectedLayerIndex(1);
                       setOpenAddLayerSheet(true);
@@ -759,10 +760,10 @@ export const Costing = () => {
                   </Button>
                 </div>
               </div>
-              <div className="grid gap-6 mb-4 lg:grid-cols-0 py-4">
-                <div className="mr-0 ml-auto">
-                  <Button variant="default" disabled={loading}>
-                    {loading && <Spinner data-icon="inline-start" />}
+              <div className='grid gap-6 mb-4 lg:grid-cols-0 py-4'>
+                <div className='mr-0 ml-auto'>
+                  <Button variant='default' disabled={loading}>
+                    {loading && <Spinner data-icon='inline-start' />}
                     Generate Costing Request
                   </Button>
                 </div>
