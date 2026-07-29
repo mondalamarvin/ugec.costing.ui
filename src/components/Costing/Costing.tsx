@@ -257,6 +257,7 @@ export const Costing = () => {
 
     setLayerOptions((prevOptions) => [...prevOptions, newLayer]);
     setOpenAddLayerSheet(false);
+    setSelectedLayerIndex(null);
   }, [
     layerType,
     categoryOptions, // Added
@@ -268,9 +269,14 @@ export const Costing = () => {
     // materialOptions removed if unused inside the handler
   ]);
 
+  const removeLayerClickHandler = useCallback((index: number) => {
+    setLayerOptions((prev) => prev.filter((item) => item.layerOrder !== index));
+    setSelectedLayerIndex(null);
+  }, []);
+
   return (
     <>
-      {/* {selectedLayerIndex !== null && (
+      {selectedLayerIndex !== null && (
         <Sheet open={openSheet} onOpenChange={setOpenSheet}>
           <SheetContent>
             <SheetHeader>
@@ -280,20 +286,28 @@ export const Costing = () => {
               </SheetDescription>
             </SheetHeader>
             <Container>
-              <div className="grid grid-cols-2">
-                <div className="flex flex-col">
+              <div className='grid grid-cols-2'>
+                <div className='flex flex-col'>
                   <span>Coverage (%)</span>
                   <b>{layerOptions[selectedLayerIndex].coveragePercent}%</b>
                 </div>
-                <div className="flex flex-col">
+                <div className='flex flex-col'>
                   <span>TNVC (%)</span>
                   <b>{layerOptions[selectedLayerIndex].tnvc}%</b>
                 </div>
               </div>
+              <div className='py-8'>
+                <Button
+                  onClick={() => removeLayerClickHandler(selectedLayerIndex)}
+                >
+                  Remove Item
+                </Button>
+              </div>
             </Container>
           </SheetContent>
         </Sheet>
-      )} */}
+      )}
+
       <Sheet open={openAddLayerSheet} onOpenChange={setOpenAddLayerSheet}>
         <SheetContent>
           <SheetHeader>
@@ -703,14 +717,6 @@ export const Costing = () => {
                   />
                 </div>
               </div>
-              {/* {layerOptions && layerOptions.length > 0 && (
-              <div className="flex grid gap-6 mb-4 lg:grid-cols-0">
-                <div>Layer</div>
-                <div>Layer</div>
-                <div>Layer</div>
-                <div>Layer</div>
-              </div>
-            )} */}
               <div className='grid gap-0'>
                 {layerOptions.map((layer, index) => {
                   return (
@@ -749,7 +755,7 @@ export const Costing = () => {
                     type='button'
                     className='py-4'
                     onClick={() => {
-                      setSelectedLayerIndex(1);
+                      // setSelectedLayerIndex(1);
                       setOpenAddLayerSheet(true);
                       // dispatch(resetMaterials());
                       // dispatch(resetFormulas());
