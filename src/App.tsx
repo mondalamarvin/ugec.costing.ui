@@ -1,8 +1,8 @@
-import { Costing } from "./components/Costing";
+import { Costing, CostingOld } from './components/Costing';
 function App() {
   return (
     <>
-      <section id="center">
+      <section id='center'>
         <Costing />
       </section>
     </>

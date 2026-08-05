@@ -1,5 +1,16 @@
-import type { ReactNode } from "react";
+import type { ReactNode } from 'react';
+import { cn } from '../../lib/utils';
 
-export const Container = ({ children }: { children: ReactNode }) => {
-  return <div className="container mx-auto px-4 mt-5">{children}</div>;
+export const Container = ({
+  className,
+  children,
+}: {
+  children: ReactNode;
+  className?: string;
+}) => {
+  return (
+    <div className={cn('container mx-auto px-4 mt-5', className)}>
+      {children}
+    </div>
+  );
 };
