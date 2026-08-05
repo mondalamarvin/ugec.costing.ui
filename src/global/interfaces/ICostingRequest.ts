@@ -4,6 +4,7 @@ export interface IProcessRoute {
 }
 
 export interface ILayers {
+  id: number;
   type: string;
   layerOrder: number;
   materialId?: number;
