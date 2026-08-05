@@ -23,4 +23,5 @@ export interface IInputErrors {
   totalImages?: boolean;
   processRoute?: boolean;
   material?: boolean;
+  vehicle?: boolean;
 }
