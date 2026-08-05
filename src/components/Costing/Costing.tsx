@@ -1,15 +1,30 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import {
+  GripVertical,
+  Edit2,
+  Trash2,
+  ChevronDown,
+  ChevronRight,
+  Plus,
+} from 'lucide-react';
 import Select from 'react-select';
 import classNames from 'classnames';
-import type { AppDispatch } from '../../store/store';
-import { ChevronRight } from 'lucide-react';
-import {
-  setSingleSelectState,
-  setMultiSelectState,
-  customErrorStyle,
-  setInputState,
-} from '../../lib';
 import {
   Button,
   Card,
@@ -30,11 +45,11 @@ import {
   Progress,
   Badge,
   CardAction,
+  SortableItem,
 } from '../ui';
-import {
-  generateCostingRequest,
-  selectCostingLoading,
-} from '../../store/slices/costingSlice';
+
+import type { AppDispatch } from '../../store/store';
+
 import {
   fetchMaterialCategories,
   fetchMaterialsByCategory,
@@ -43,65 +58,155 @@ import {
   selectMaterials,
   selectCategories,
 } from '../../store/slices/materialSlice';
+
 import {
-  fetchFormulas,
-  selectFormulas,
-  selectFormula,
-  selectFormulaLoading,
-  resetFormulas,
-  fetchFormulaById,
-} from '../../store/slices/formulaSlice';
+  generateCostingRequest,
+  selectCostingLoading,
+} from '../../store/slices/costingSlice';
+
+import {
+  setSingleSelectState,
+  setMultiSelectState,
+  customErrorStyle,
+  setInputState,
+} from '../../lib';
+
 import type {
   ICostingRequest,
   IInputErrors,
-  ISelect,
-  IFormula,
-  IMaterial,
   ILayers,
+  ISelect,
+  // IFormula,
+  // IMaterial,
+  // ILayers,
 } from '../../global/interfaces';
 
-const orderTypeOptions = [{ value: 'Conesleeves', label: 'Conesleeves' }];
+// --- Types ---
+interface MachineItem {
+  value: number;
+  label: string;
+}
 
-// const categoryTypeOptions = [
-//   { value: 1, label: "Adhesive" },
-//   { value: 3, label: "Ink" },
-//   { value: 6, label: "Substrate" },
-// ];
+interface ComponentItem {
+  id: string;
+  name: string;
+  subMaterials?: { name: string; tnvc: string }[];
+}
+
+interface LayerItem {
+  id: string;
+  title: string;
+  coverage?: string;
+  tnvc?: string;
+  components?: ComponentItem[];
+}
+
+interface ICategoryOption {
+  value: number;
+  label: string;
+  category: string;
+}
 
 const machineOptions = [
-  { value: 1, label: 'Bobst CL750 D1350/450 Laminating Machine (without LPG)' },
+  {
+    value: 1,
+    label: 'Bobst CL750 D1350/450 Laminating Machine (without LPG)',
+    order: 0,
+  },
   { value: 2, label: 'New Web Control Jumbo (Rewinding)' },
   { value: 3, label: 'Rotopak 888 1200/300C' },
   { value: 4, label: 'Automatic Punching' },
   { value: 5, label: 'Dayuan' },
 ];
 
-// const layerOptions = [
-//   {
-//     type: "Substrate",
-//     layerOrder: 1,
-//     materialId: 2,
-//     name: "Aluminum Foil [16.2]",
-//     coveragePercent: 100,
-//     tnvc: 100,
-//   },
-//   {
-//     type: "Substrate",
-//     layerOrder: 1,
-//     materialId: 3,
-//     name: "MG Paper [70]",
-//     coveragePercent: 80,
-//     tnvc: 100,
-//   },
-//   {
-//     type: "Formula",
-//     layerOrder: 3,
-//     formulaId: 1,
-//     name: "Siegwerk NC 220 -11 [IDS (Gravure) PV 137 White]",
-//     coveragePercent: 80,
-//     tnvc: 36,
-//   },
-// ];
+const layerOprions = [
+  {
+    id: 1,
+    type: 'Substrate',
+    layerOrder: 1,
+    materialId: 2,
+    name: 'Aluminum Foil [18.9]',
+    coveragePercent: 100,
+    tnvc: 100,
+  },
+  {
+    id: 2,
+    type: 'Substrate',
+    layerOrder: 2,
+    materialId: 3,
+    name: 'MG Paper [70]',
+    coveragePercent: 100,
+    tnvc: 100,
+  },
+  {
+    id: 3,
+    type: 'Formula',
+    layerOrder: 3,
+    formulaId: 1,
+    name: 'Siegwerk NC 220 -11 [IDS (Gravure) PV 137 White]',
+    coveragePercent: 80,
+    tnvc: 36,
+  },
+  {
+    id: 4,
+    type: 'Formula',
+    layerOrder: 4,
+    formulaId: 2,
+    name: 'NC 220-11 IDS Inks Colored (Gravure)',
+    coveragePercent: 60,
+    tnvc: 28,
+    components: [
+      {
+        materialId: 17,
+        subComponents: [],
+      },
+      {
+        materialId: 18,
+        subComponents: [],
+      },
+      {
+        materialId: 10,
+        subComponents: [
+          { materialId: 11, tnvc: 12.44 },
+          { materialId: 12, tnvc: 47.35 },
+          { materialId: 13, tnvc: 10.76 },
+          { materialId: 14, tnvc: 4.24 },
+          { materialId: 15, tnvc: 12.35 },
+          { materialId: 16, tnvc: 12.86 },
+        ],
+      },
+    ],
+  },
+  {
+    id: 5,
+    type: 'Formula',
+    layerOrder: 5,
+    formulaId: 3,
+    name: 'SW NC 220-11 Over Print (Gravure)',
+    coveragePercent: 100,
+    tnvc: 28,
+  },
+  {
+    id: 6,
+    type: 'Formula',
+    layerOrder: 6,
+    formulaId: 4,
+    name: 'SW WB 503 Primer',
+    coveragePercent: 100,
+    tnvc: 12,
+  },
+  {
+    id: 7,
+    type: 'Formulation',
+    layerOrder: 7,
+    materialId: 21,
+    name: 'Adhesive SF (Monocomponent)',
+    coveragePercent: 100,
+    tnvc: 100,
+  },
+];
+
+const orderTypeOptions = [{ value: 'Conesleeves', label: 'Conesleeves' }];
 
 export const mapToProcessRoute = (items: readonly ISelect[]) => {
   return items.map((item, index) => ({
@@ -110,64 +215,39 @@ export const mapToProcessRoute = (items: readonly ISelect[]) => {
   }));
 };
 
-interface ICategoryOption {
-  value: number;
-  label: string;
-  category: string;
-}
-
+// --- Main Advanced Calculator Component ---
 export const Costing = () => {
   const [categoryOptions, setCategoryOptions] = useState<ICategoryOption[]>([]);
-  const [layerType, setLayerType] = useState<number>(0);
-  const [netRollWidth, setNetRollWidth] = useState<number>(0);
-  const [noOfColors, setNoOfColors] = useState<number>(0);
-  const [noOfOuts, setNoOfOuts] = useState<number>(0);
-  const [noOfUps, setNoOfUps] = useState<number>(0);
-  const [openAddLayerSheet, setOpenAddLayerSheet] = useState<boolean>(false);
-  const [openSheet, setOpenSheet] = useState<boolean>(false);
-  const [orderType, setOrderType] = useState<string>('');
-  const [pcsPerBox, setPcsPerBox] = useState<number>(0);
-  const [processRoute, setProcessRoute] = useState<readonly ISelect[]>([]);
-  const [quantityOrder, setQuantityOrder] = useState<number>(0);
-  const [repeatLength, setRepeatLength] = useState<number>(0);
-  const [selectedFormula, setSelectedFormula] = useState<number>(0);
-  const [selectedMaterial, setSelectedMaterial] = useState<number>(0);
-  const [spreadHeight, setSpreadHeight] = useState<number>(0);
-  const [spreadWidth, setSpreadWidth] = useState<number>(0);
-  const [totalImages, setTotalImages] = useState<number>(0);
-  const [selectedLayerIndex, setSelectedLayerIndex] = useState<number | null>(
-    null,
-  );
-  const [layerOptions, setLayerOptions] = useState<ILayers[]>([]);
-  const [inkDetails, setInkDetails] = useState<IFormula | null>(null);
-  const [materialDetails, setMaterialDetails] = useState<IMaterial | null>(
-    null,
-  );
   const [errors, setErrors] = useState<IInputErrors>({});
+  const [expandedLayer, setExpandedLayer] = useState<number | null>(4);
+  const [expandedComp, setExpandedComp] = useState<number | null>(3);
+  const [layers, setLayers] = useState<ILayers[]>(layerOprions);
+  const [machines, setMachines] = useState<MachineItem[]>(
+    machineOptions.map((m, idx) => ({
+      ...m,
+      stepOrder: idx + 1,
+    })),
+  );
+  const [netRollWidth, setNetRollWidth] = useState<number>(559.71);
+  const [noOfColors, setNoOfColors] = useState<number>(8);
+  const [noOfOuts, setNoOfOuts] = useState<number>(4);
+  const [noOfUps, setNoOfUps] = useState<number>(3);
+  const [orderType, setOrderType] = useState<string>('');
+  const [quantityOrder, setQuantityOrder] = useState<number>(2000000);
+  const [repeatLength, setRepeatLength] = useState<number>(533.05);
+  const [pcsPerBox, setPcsPerBox] = useState<number>(5000);
+  const [spreadHeight, setSpreadHeight] = useState<number>(173.41);
+  const [spreadWidth, setSpreadWidth] = useState<number>(180.38);
+  const [totalImages, setTotalImages] = useState<number>(12);
+  const [vehicle, setVehicle] = useState<string>('L300');
 
   const dispatch = useDispatch<AppDispatch>();
-
   const materialCategories = useSelector(selectCategories);
-  const materialOptions = useSelector(selectMaterials);
-  const formulaOptions = useSelector(selectFormulas);
-  const selectedFormulaDetails = useSelector(selectFormula);
-
-  const loading = useSelector(selectCostingLoading);
-  const loadingMaterials = useSelector(selectMaterialLoading);
-  const loadingFormulas = useSelector(selectFormulaLoading);
+  const costingLoading = useSelector(selectCostingLoading);
 
   useEffect(() => {
     dispatch(fetchMaterialCategories());
   }, [dispatch]);
-
-  useEffect(() => {
-    if (layerType > 0 && layerType !== 3) {
-      dispatch(fetchMaterialsByCategory(layerType));
-    }
-    if (layerType > 0 && layerType == 3) {
-      dispatch(fetchFormulas());
-    }
-  }, [layerType, dispatch]);
 
   useEffect(() => {
     if (materialCategories) {
@@ -175,34 +255,47 @@ export const Costing = () => {
     }
   }, [materialCategories]);
 
-  const selectFormulaChangeHandler = useCallback(
-    (formula: any) => {
-      const details = formulaOptions.find((f) => f.value === formula.value);
-      setInkDetails(details ?? null);
-      setTimeout(() => {
-        if (details) {
-          dispatch(fetchFormulaById(details.value));
-        }
-      }, 1);
-    },
-    [formulaOptions, selectedFormula],
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
   );
 
-  const selectMaterialChangeHandler = useCallback(
-    (material: any) => {
-      const details = materialOptions.find(
-        (m: IMaterial) => m.value === material.value,
-      );
-      if (details) {
-        setMaterialDetails(details);
-      }
-    },
-    [materialOptions, selectedMaterial],
-  );
+  const handleMachineDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) return;
+
+    setMachines((prevMachines) => {
+      const oldIndex = prevMachines.findIndex((m) => m.value === active.id);
+      const newIndex = prevMachines.findIndex((m) => m.value === over.id);
+      const reordered = arrayMove(prevMachines, oldIndex, newIndex);
+      return reordered.map((machine, index) => ({
+        ...machine,
+        stepOrder: index,
+      }));
+    });
+  };
+
+  const handleLayerDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) return;
+
+    setLayers((prevLayers) => {
+      const oldIndex = prevLayers.findIndex((m) => m.id === active.id);
+      const newIndex = prevLayers.findIndex((m) => m.id === over.id);
+      const reordered = arrayMove(prevLayers, oldIndex, newIndex);
+      return reordered.map((layer, index) => ({
+        ...layer,
+        layerOrder: index,
+      }));
+    });
+  };
 
   const submitCostingHandler = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
-
     const data: ICostingRequest = {
       orderType: orderType,
       quantityOrder: quantityOrder,
@@ -215,275 +308,56 @@ export const Costing = () => {
       repeatLength: repeatLength,
       pcsPerBox: pcsPerBox,
       noOfColor: noOfColors,
-      processRoute: mapToProcessRoute(processRoute),
-      layers: layerOptions,
+      processRoute: mapToProcessRoute(machines),
+      layers: layers,
       vehicle: 'L300',
     };
-    console.log('[[Data]]', data);
+    // console.log('[[Data]]', data);
     dispatch(generateCostingRequest(data));
   };
 
-  const addLayerClickHandler = useCallback(() => {
-    // Extract just the category string, fallback to empty string or default if not found
-    const typeString =
-      categoryOptions.find((c: ICategoryOption) => c.value === layerType)
-        ?.category ?? '';
-
-    const layerOrder = layerOptions.length;
-    const isInk = layerType === 3;
-
-    const name = isInk ? inkDetails?.label : materialDetails?.label;
-    const formulaIdOrMaterialId = isInk ? selectedFormula : selectedMaterial;
-
-    const baseLayer = {
-      type: typeString, // Now correctly a string
-      layerOrder,
-      name,
-    };
-
-    const newLayer: ILayers = isInk
-      ? ({
-          ...baseLayer,
-          formulaId: formulaIdOrMaterialId ?? 0,
-          coveragePercent: inkDetails?.printCoverage,
-          tnvc: inkDetails?.tnvc,
-        } as ILayers)
-      : ({
-          ...baseLayer,
-          materialId: formulaIdOrMaterialId ?? 0,
-          coveragePercent: 100,
-          tnvc: 100,
-        } as ILayers);
-
-    setLayerOptions((prevOptions) => [...prevOptions, newLayer]);
-    setOpenAddLayerSheet(false);
-    setSelectedLayerIndex(null);
-  }, [
-    layerType,
-    categoryOptions, // Added
-    layerOptions, // Added to prevent stale length logic
-    inkDetails,
-    materialDetails,
-    selectedFormula,
-    selectedMaterial,
-    // materialOptions removed if unused inside the handler
-  ]);
-
-  const removeLayerClickHandler = useCallback((index: number) => {
-    setLayerOptions((prev) => prev.filter((item) => item.layerOrder !== index));
-    setSelectedLayerIndex(null);
-  }, []);
-
   return (
-    <>
-      {selectedLayerIndex !== null && (
-        <Sheet open={openSheet} onOpenChange={setOpenSheet}>
-          <SheetContent>
-            <SheetHeader>
-              <SheetTitle>Layer {selectedLayerIndex} Details</SheetTitle>
-              <SheetDescription>
-                Type: {layerOptions[selectedLayerIndex].type}
-              </SheetDescription>
-            </SheetHeader>
-            <Container>
-              <div className='grid grid-cols-2'>
-                <div className='flex flex-col'>
-                  <span>Coverage (%)</span>
-                  <b>{layerOptions[selectedLayerIndex].coveragePercent}%</b>
-                </div>
-                <div className='flex flex-col'>
-                  <span>TNVC (%)</span>
-                  <b>{layerOptions[selectedLayerIndex].tnvc}%</b>
-                </div>
-              </div>
-              <div className='py-8'>
-                <Button
-                  onClick={() => removeLayerClickHandler(selectedLayerIndex)}
-                >
-                  Remove Item
-                </Button>
-              </div>
-            </Container>
-          </SheetContent>
-        </Sheet>
-      )}
+    <div className='min-h-screen bg-slate-100 p-6 text-gray-800'>
+      {/* Title Bar */}
+      <div className='mb-6'>
+        <h1 className='text-2xl font-bold text-gray-900'>
+          Costing App: Advanced Calculator
+        </h1>
+        <p className='text-sm text-gray-500'>
+          Dashboard / Calculator /{' '}
+          <span className='text-gray-800 font-medium'>New</span>
+        </p>
+      </div>
 
-      <Sheet open={openAddLayerSheet} onOpenChange={setOpenAddLayerSheet}>
-        <SheetContent>
-          <SheetHeader>
-            <SheetTitle>Add New Layer</SheetTitle>
-            <SheetDescription>
-              {/* Type: {layerOptions[selectedLayerIndex].type} */}
-            </SheetDescription>
-          </SheetHeader>
-          <Container>
-            <div className='grid gap-6 mb-4 lg:grid-cols-0'>
-              <div>
-                <label
-                  htmlFor='layerType'
-                  className={classNames(
-                    'block mb-2 text-sm font-medium',
-                    errors.layerType ? 'text-red-600' : 'text-gray-900',
-                  )}
-                >
-                  Type
-                </label>
-                <Select<ISelect>
-                  id='layerType'
-                  options={categoryOptions}
-                  onChange={(type) => {
-                    setSingleSelectState(
-                      setLayerType,
-                      setErrors,
-                      'layerType',
-                      type,
-                    );
-                  }}
-                  styles={customErrorStyle('layerType', errors.layerType)}
-                />
-              </div>
-            </div>
-            {layerType !== 3 && layerType !== null && (
-              <div className='grid gap-6 mb-4 lg:grid-cols-0'>
-                <div>
-                  <label
-                    htmlFor='selectedMaterial'
-                    className={classNames(
-                      'block mb-2 text-sm font-medium',
-                      errors.orderType ? 'text-red-600' : 'text-gray-900',
-                    )}
-                  >
-                    Material
-                  </label>
-                  <Select<ISelect>
-                    isLoading={loadingMaterials}
-                    isDisabled={loadingMaterials}
-                    id='selectedMaterial'
-                    options={materialOptions}
-                    onChange={(item) => {
-                      selectMaterialChangeHandler(item);
-                      setSingleSelectState(
-                        setSelectedMaterial,
-                        setErrors,
-                        'selectedMaterial',
-                        item,
-                      );
-                    }}
-                    styles={customErrorStyle(
-                      'selectedMaterial',
-                      errors.selectedMaterial,
-                    )}
-                  />
-                </div>
-              </div>
-            )}
-            {layerType === 3 && layerType !== null && (
-              <div className='grid gap-6 mb-4 lg:grid-cols-0'>
-                <div>
-                  <label
-                    htmlFor='selectedFormula'
-                    className={classNames(
-                      'block mb-2 text-sm font-medium',
-                      errors.orderType ? 'text-red-600' : 'text-gray-900',
-                    )}
-                  >
-                    Formula
-                  </label>
-                  <Select<ISelect>
-                    id='selectedFormula'
-                    isLoading={loadingFormulas}
-                    isDisabled={loadingFormulas}
-                    options={formulaOptions}
-                    onChange={(formula) => {
-                      selectFormulaChangeHandler(formula);
-                      setSingleSelectState(
-                        setSelectedFormula,
-                        setErrors,
-                        'selectedFormula',
-                        formula,
-                      );
-                    }}
-                    styles={customErrorStyle(
-                      'selectedFormula',
-                      errors.selectedFormula,
-                    )}
-                  />
-                </div>
-              </div>
-            )}
-            {layerType === 3 && layerType !== null && inkDetails !== null && (
-              <>
-                <div className='grid grid-cols-2'>
-                  <div className='flex flex-col'>
-                    <span>Coverage (%)</span>
-                    <b>{inkDetails?.printCoverage}%</b>
-                  </div>
-                  <div className='flex flex-col'>
-                    <span>TNVC (%)</span>
-                    <b>{inkDetails?.tnvc}%</b>
-                  </div>
-                </div>
-                <hr />
-                <div className='grid grid-cols-1 py-4'>
-                  <div className='flex'>
-                    <b>Components: </b>
-                    <Badge className='ml-2' variant='default'>
-                      {selectedFormulaDetails?.components.length}
-                    </Badge>
-                  </div>
-                  <span className='text-xs'>
-                    The formula contains the following components
-                  </span>
-                </div>
-                <div className='max-h-64 overflow-y-auto'>
-                  {selectedFormulaDetails &&
-                    selectedFormulaDetails.components.map(
-                      (detail: any, index: number) => (
-                        <Card className='rounded-xs py-1.5' key={index}>
-                          <CardContent className='grd grid-cols-2'>
-                            <div className='flex'>{detail.material.name}</div>
-                            <div className='flex font-bold'>
-                              <span>Mixing Ratio:</span>
-                              <p className='px-2'>{detail.mixingRatio}%</p>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ),
-                    )}
-                </div>
-              </>
-            )}
-            <div className='py-4'>
-              <Button
-                type='button'
-                className='py-4'
-                onClick={() => addLayerClickHandler()}
-              >
-                Add To Layer
-              </Button>
-            </div>
-          </Container>
-        </SheetContent>
-      </Sheet>
-      <Container>
-        <Card>
-          <CardHeader>
-            <CardTitle>Create Costing</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Form onSubmit={submitCostingHandler}>
-              <div className='grid gap-6 mb-4 lg:grid-cols-2'>
-                <div>
+      {/* Main Grid: Left 2 cols, Right 1 col */}
+      <form onSubmit={submitCostingHandler}>
+        <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
+          {/* LEFT COLUMN */}
+          <div className='lg:col-span-2 space-y-6'>
+            {/* Section 1: Job Overview & Imposition */}
+            <div className='bg-white p-5 rounded-lg border border-gray-200 shadow-sm'>
+              <h2 className='text-lg font-bold text-gray-800 mb-4'>
+                Job Overview & Imposition
+              </h2>
+
+              <div className='grid grid-cols-2 sm:grid-cols-8 gap-4'>
+                <div className='col-span-2'>
                   <label
                     htmlFor='orderType'
                     className={classNames(
-                      'block mb-2 text-sm font-medium',
+                      'block text-xs font-semibold text-gray-600 mb-2',
                       errors.orderType ? 'text-red-600' : 'text-gray-900',
                     )}
                   >
                     Order Type
                   </label>
                   <Select<ISelect>
+                    classNames={{
+                      control: () => '!min-h-8 !h-8 rounded-md !border-input',
+                      valueContainer: () => '!py-0 !h-full',
+                      indicatorsContainer: () => '!h-full',
+                      input: () => '!m-0 !p-0',
+                    }}
                     id='orderType'
                     options={orderTypeOptions}
                     onChange={(order) =>
@@ -497,10 +371,17 @@ export const Costing = () => {
                     styles={customErrorStyle('orderType', errors.orderType)}
                   />
                 </div>
-                <div className='flex-1'>
+
+                <div className='col-span-2'>
                   <Field data-invalid={errors && errors.quantityOrder}>
-                    <FieldLabel htmlFor='quantityOrder'>Quantity</FieldLabel>
+                    <FieldLabel
+                      htmlFor='quantityOrder'
+                      className='block text-xs font-semibold text-gray-600 mb-0'
+                    >
+                      Quantity
+                    </FieldLabel>
                     <Input
+                      className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
                       name='quantityOrder'
                       type='number'
                       onChange={(e) =>
@@ -516,12 +397,36 @@ export const Costing = () => {
                     />
                   </Field>
                 </div>
-              </div>
-              <div className='grid gap-6 mb-4 lg:grid-cols-2'>
-                <div>
-                  <Field data-invalid={errors && errors.spreadWidth}>
-                    <FieldLabel htmlFor='spreadWidth'>Spread Width</FieldLabel>
+                <div className='col-span-2'>
+                  <Field data-invalid={errors && errors.noOfColors}>
+                    <FieldLabel
+                      htmlFor='noOfColors'
+                      className='block text-xs font-semibold text-gray-600 mb-0'
+                    >
+                      Number Of Colors
+                    </FieldLabel>
                     <Input
+                      className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
+                      name='noOfColors'
+                      type='number'
+                      onChange={(e) =>
+                        setInputState(e, setNoOfColors, setErrors, 'noOfColors')
+                      }
+                      value={noOfColors}
+                      aria-invalid={errors && errors.noOfColors}
+                    />
+                  </Field>
+                </div>
+                <div className='col-span-2'>
+                  <Field data-invalid={errors && errors.spreadWidth}>
+                    <FieldLabel
+                      htmlFor='spreadWidth'
+                      className='block text-xs font-semibold text-gray-600 mb-0'
+                    >
+                      Spread Width
+                    </FieldLabel>
+                    <Input
+                      className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
                       name='spreadWidth'
                       type='number'
                       onChange={(e) =>
@@ -537,12 +442,16 @@ export const Costing = () => {
                     />
                   </Field>
                 </div>
-                <div>
+                <div className='col-span-2'>
                   <Field data-invalid={errors && errors.spreadHeight}>
-                    <FieldLabel htmlFor='spreadHeigth'>
+                    <FieldLabel
+                      htmlFor='spreadHeight'
+                      className='block text-xs font-semibold text-gray-600 mb-0'
+                    >
                       Spread Height
                     </FieldLabel>
                     <Input
+                      className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
                       name='spreadHeight'
                       type='number'
                       onChange={(e) =>
@@ -558,12 +467,16 @@ export const Costing = () => {
                     />
                   </Field>
                 </div>
-              </div>
-              <div className='grid gap-6 mb-4 lg:grid-cols-2'>
-                <div>
+                <div className='col-span-2'>
                   <Field data-invalid={errors && errors.noOfUps}>
-                    <FieldLabel htmlFor='noOfUps'>Number Of Ups</FieldLabel>
+                    <FieldLabel
+                      htmlFor='noOfUps'
+                      className='block text-xs font-semibold text-gray-600 mb-0'
+                    >
+                      Number Of Ups
+                    </FieldLabel>
                     <Input
+                      className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
                       name='noOfUps'
                       type='number'
                       onChange={(e) =>
@@ -574,10 +487,16 @@ export const Costing = () => {
                     />
                   </Field>
                 </div>
-                <div>
+                <div className='col-span-2'>
                   <Field data-invalid={errors && errors.noOfOuts}>
-                    <FieldLabel htmlFor='noOfOuts'>Number Of Outs</FieldLabel>
+                    <FieldLabel
+                      htmlFor='noOfOuts'
+                      className='block text-xs font-semibold text-gray-600 mb-0'
+                    >
+                      Number Of Outs
+                    </FieldLabel>
                     <Input
+                      className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
                       name='noOfOuts'
                       type='number'
                       onChange={(e) =>
@@ -588,33 +507,16 @@ export const Costing = () => {
                     />
                   </Field>
                 </div>
-              </div>
-              <div className='grid gap-6 mb-4 lg:grid-cols-2'>
-                <div>
-                  <Field data-invalid={errors && errors.totalImages}>
-                    <FieldLabel htmlFor='totalImages'>Total Images</FieldLabel>
-                    <Input
-                      name='totalImages'
-                      type='number'
-                      onChange={(e) =>
-                        setInputState(
-                          e,
-                          setTotalImages,
-                          setErrors,
-                          'totalImages',
-                        )
-                      }
-                      value={totalImages}
-                      aria-invalid={errors && errors.totalImages}
-                    />
-                  </Field>
-                </div>
-                <div>
+                <div className='col-span-2'>
                   <Field data-invalid={errors && errors.netRollWidth}>
-                    <FieldLabel htmlFor='netRollWidth'>
+                    <FieldLabel
+                      htmlFor='netRollWidth'
+                      className='block text-xs font-semibold text-gray-600 mb-0'
+                    >
                       Net Roll Width
                     </FieldLabel>
                     <Input
+                      className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
                       name='netRollWidth'
                       type='number'
                       onChange={(e) =>
@@ -630,14 +532,16 @@ export const Costing = () => {
                     />
                   </Field>
                 </div>
-              </div>
-              <div className='grid gap-6 mb-4 lg:grid-cols-3'>
-                <div>
+                <div className='col-span-2'>
                   <Field data-invalid={errors && errors.repeatLength}>
-                    <FieldLabel htmlFor='repeatLength'>
+                    <FieldLabel
+                      htmlFor='repeatLength'
+                      className='block text-xs font-semibold text-gray-600 mb-0'
+                    >
                       Repeat Length
                     </FieldLabel>
                     <Input
+                      className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
                       name='repeatLength'
                       type='number'
                       onChange={(e) =>
@@ -653,12 +557,41 @@ export const Costing = () => {
                     />
                   </Field>
                 </div>
-                <div>
-                  <Field data-invalid={errors && errors.pcsPerBox}>
-                    <FieldLabel htmlFor='spreadHeigth'>
-                      Pieces Per Box
+                <div className='col-span-2'>
+                  <Field data-invalid={errors && errors.totalImages}>
+                    <FieldLabel
+                      htmlFor='totalImages'
+                      className='block text-xs font-semibold text-gray-600 mb-0'
+                    >
+                      Total Images
                     </FieldLabel>
                     <Input
+                      className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
+                      name='totalImages'
+                      type='number'
+                      onChange={(e) =>
+                        setInputState(
+                          e,
+                          setTotalImages,
+                          setErrors,
+                          'totalImages',
+                        )
+                      }
+                      value={totalImages}
+                      aria-invalid={errors && errors.totalImages}
+                    />
+                  </Field>
+                </div>
+                <div className='col-span-2'>
+                  <Field data-invalid={errors && errors.pcsPerBox}>
+                    <FieldLabel
+                      htmlFor='pcsPerBox'
+                      className='block text-xs font-semibold text-gray-600 mb-0'
+                    >
+                      Pcs/Box
+                    </FieldLabel>
+                    <Input
+                      className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
                       name='pcsPerBox'
                       type='number'
                       onChange={(e) =>
@@ -669,115 +602,276 @@ export const Costing = () => {
                     />
                   </Field>
                 </div>
-                <div>
-                  <Field data-invalid={errors && errors.noOfColors}>
-                    <FieldLabel htmlFor='noOfColors'>
-                      Number Of Colors
+                <div className='col-span-2'>
+                  <Field data-invalid={errors && errors.vehicle}>
+                    <FieldLabel
+                      htmlFor='vehicle'
+                      className='block text-xs font-semibold text-gray-600 mb-0'
+                    >
+                      Vehicle
                     </FieldLabel>
                     <Input
-                      name='noOfColors'
-                      type='number'
+                      className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
+                      name='vehicle'
+                      placeholder='L300'
                       onChange={(e) =>
-                        setInputState(e, setNoOfColors, setErrors, 'noOfColors')
+                        setInputState(e, setVehicle, setErrors, 'vehicle')
                       }
-                      value={noOfColors}
-                      aria-invalid={errors && errors.noOfColors}
+                      value={vehicle}
+                      aria-invalid={errors && errors.vehicle}
                     />
                   </Field>
                 </div>
               </div>
-              <div className='grid gap-6 mb-4 lg:grid-cols-0'>
+            </div>
+
+            {/* Section 2: Process Routing (Step Sequencer) */}
+            <div className='bg-white p-5 rounded-lg border border-gray-200 shadow-sm'>
+              <div className='flex items-center justify-between mb-4'>
                 <div>
-                  <label
-                    htmlFor='processRoute'
-                    className={classNames(
-                      'block mb-2 text-sm font-medium',
-                      errors.processRoute ? 'text-red-600' : 'text-gray-900',
-                    )}
-                  >
-                    Machines
-                  </label>
-                  <Select<ISelect, true>
-                    id='processRoute'
-                    isMulti
-                    options={machineOptions}
-                    value={processRoute}
-                    onChange={(value) =>
-                      setMultiSelectState(
-                        setProcessRoute,
-                        setErrors,
-                        'processRoute',
-                        value,
-                      )
-                    }
-                    styles={customErrorStyle(
-                      'processRoute',
-                      errors.processRoute,
-                    )}
-                  />
+                  <h2 className='text-md font-bold text-gray-800'>
+                    Process Routing (Step Sequencer)
+                  </h2>
+                  <p className='text-xs text-gray-400'>(Draggable Stack)</p>
                 </div>
+                <button className='flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-3 py-1.5 rounded'>
+                  <Plus className='w-3.5 h-3.5' /> Add Machine
+                </button>
               </div>
-              <div className='grid gap-0'>
-                {layerOptions.map((layer, index) => {
-                  return (
-                    <Card className='rounded-sm' key={index}>
-                      <CardContent className='p-2'>
-                        <div className='grid gap-3 lg:grid-cols-[2fr_1fr_2fr_1fr_auto] items-center'>
-                          <div className='lg:pl-8'>
-                            {layer.type}
-                            <br />
-                            {layer.name}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleMachineDragEnd}
+              >
+                <SortableContext
+                  items={machines.map((r) => r.value)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {machines.map((machine, index) => (
+                    <SortableItem key={machine.value} id={machine.value}>
+                      {({ dragHandleProps }) => (
+                        /* Custom Machine Row Design */
+                        <div className='flex items-center justify-between p-3 bg-white border border-gray-200 rounded-md mb-2 shadow-sm'>
+                          <div className='flex items-center gap-3'>
+                            {/* Drag Handle Button */}
+                            <button
+                              type='button'
+                              {...dragHandleProps.attributes}
+                              {...dragHandleProps.listeners}
+                              className='cursor-grab text-gray-400 hover:text-gray-600 p-1'
+                            >
+                              <GripVertical className='w-4 h-4' />
+                            </button>
+                            <span className='font-bold text-gray-700'>
+                              {index + 1}
+                            </span>
+                            <span className='font-semibold text-gray-800'>
+                              {machine.label}
+                            </span>
                           </div>
-                          <div>
-                            <Badge>{layer.type}</Badge>
-                          </div>
-                          <div>
-                            {layer.coveragePercent}%
-                            <Progress value={layer.coveragePercent} />
-                          </div>
-                          <div>{layer.tnvc}%</div>
-                          <div>
-                            <ChevronRight
-                              className='h-4 w-4'
-                              onClick={() => {
-                                setSelectedLayerIndex(index);
-                                setOpenSheet(true);
-                              }}
-                            />
-                          </div>
+
+                          {/* <div className='flex items-center gap-2'>
+                          <button onClick={() => editMachine(route.id)}>
+                            <Edit2 className='w-4 h-4 text-gray-400' />
+                          </button>
+                        </div> */}
                         </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-                <div className='py-4'>
-                  <Button
-                    type='button'
-                    className='py-4'
-                    onClick={() => {
-                      // setSelectedLayerIndex(1);
-                      setOpenAddLayerSheet(true);
-                      // dispatch(resetMaterials());
-                      // dispatch(resetFormulas());
-                      setInkDetails(null);
-                    }}
+                      )}
+                    </SortableItem>
+                  ))}
+                </SortableContext>
+              </DndContext>
+            </div>
+
+            {/* Section 3: Packaging Materials */}
+            <div className='bg-white p-5 rounded-lg border border-gray-200 shadow-sm'>
+              <h2 className='text-lg font-bold text-gray-800 mb-2'>
+                Packaging Materials & Total Cost
+              </h2>
+              <p className='text-xs text-gray-500'>
+                Final Assembly & Packaging: Boxes (5000 units, [Mat ID 221])
+              </p>
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN */}
+          <div className='bg-white p-5 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between'>
+            <div>
+              <div className='flex items-center justify-between mb-4'>
+                <div>
+                  <h2 className='text-md font-bold text-gray-800'>
+                    Substrate & Coating Layers
+                  </h2>
+                  <p className='text-xs text-gray-400'>(Draggable Stack)</p>
+                </div>
+                <button className='flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-3 py-1.5 rounded'>
+                  <Plus className='w-3.5 h-3.5' /> Add Layer
+                </button>
+              </div>
+
+              {/* Draggable & Hierarchical Layer Stack */}
+              <div className='space-y-2'>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleLayerDragEnd}
+                >
+                  <SortableContext
+                    items={layers && layers.map((l) => l.id)}
+                    strategy={verticalListSortingStrategy}
                   >
-                    Add Layer
-                  </Button>
-                </div>
+                    {layers.map((layer, index) => {
+                      const isExpanded = expandedLayer === layer.id;
+
+                      return (
+                        <SortableItem key={layer.id} id={layer.id}>
+                          {({ dragHandleProps }) => (
+                            <div className='border border-gray-200 rounded-md overflow-hidden bg-white mb-2'>
+                              {/* Layer Header */}
+                              <div
+                                className={`flex items-center justify-between p-3 cursor-pointer text-sm font-semibold ${
+                                  isExpanded
+                                    ? 'bg-gray-100 border-b border-gray-200'
+                                    : 'bg-gray-50 hover:bg-gray-100'
+                                }`}
+                                onClick={() =>
+                                  setExpandedLayer(
+                                    isExpanded ? null : layer?.id,
+                                  )
+                                }
+                              >
+                                <div className='flex items-center gap-2'>
+                                  {/* Attached dragHandleProps & e.stopPropagation() */}
+                                  <button
+                                    type='button'
+                                    {...dragHandleProps.attributes}
+                                    {...dragHandleProps.listeners}
+                                    className='cursor-grab text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-200/50'
+                                    onClick={(e) => e.stopPropagation()} // Stops accordion toggling on drag
+                                  >
+                                    <GripVertical className='w-4 h-4 text-gray-400' />
+                                  </button>
+                                  <span className='font-bold text-gray-700'>
+                                    Layer {index + 1}
+                                  </span>
+                                  <span className='font-semibold text-gray-800'>
+                                    {layer.name}
+                                  </span>
+                                </div>
+
+                                {layer.components &&
+                                  (isExpanded ? (
+                                    <ChevronDown className='w-4 h-4 text-gray-500' />
+                                  ) : (
+                                    <ChevronRight className='w-4 h-4 text-gray-500' />
+                                  ))}
+                              </div>
+
+                              {!isExpanded && layer.components && (
+                                <div className='p-3 bg-gray-50/50 space-y-3'>
+                                  <div className='flex justify-between items-center text-xs text-gray-500 border-b pb-2'>
+                                    <span>
+                                      Formula{' '}
+                                      {layer.name
+                                        .split('[')[1]
+                                        ?.replace(']', '') || ''}
+                                    </span>
+                                    <div>
+                                      <span className='mr-3'>
+                                        Coverage <b>{layer.coveragePercent}</b>
+                                      </span>
+                                      <span>
+                                        TNVC <b>{layer.tnvc}</b>
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div className='pl-2 space-y-2 text-xs'>
+                                    {layer.components.map((comp) => {
+                                      const isCompExpanded =
+                                        expandedComp === comp.materialId;
+                                      return (
+                                        <div
+                                          key={comp.materialId}
+                                          className='rounded border border-gray-200 bg-white p-2'
+                                        >
+                                          <div
+                                            className='flex items-center gap-1 cursor-pointer font-medium text-gray-700'
+                                            onClick={() =>
+                                              setExpandedComp(
+                                                isCompExpanded
+                                                  ? null
+                                                  : comp.materialId,
+                                              )
+                                            }
+                                          >
+                                            {comp.subComponents ? (
+                                              isCompExpanded ? (
+                                                <ChevronDown className='w-3 h-3' />
+                                              ) : (
+                                                <ChevronRight className='w-3 h-3' />
+                                              )
+                                            ) : (
+                                              <span className='w-3' />
+                                            )}
+                                            <span>{comp.materialId}</span>
+                                          </div>
+
+                                          {isCompExpanded &&
+                                            comp.subComponents && (
+                                              <div className='mt-2 pl-6 space-y-1 text-gray-600 bg-gray-50 p-2 rounded'>
+                                                {comp.subComponents.map(
+                                                  (sub, i) => (
+                                                    <div
+                                                      key={i}
+                                                      className='flex justify-between'
+                                                    >
+                                                      <span>
+                                                        {sub.materialId}
+                                                      </span>
+                                                      <span className='font-semibold text-gray-800'>
+                                                        {sub.tnvc}
+                                                      </span>
+                                                    </div>
+                                                  ),
+                                                )}
+                                              </div>
+                                            )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </SortableItem>
+                      );
+                    })}
+                  </SortableContext>
+                </DndContext>
               </div>
-              <div className='grid gap-6 mb-4 lg:grid-cols-0 py-4'>
-                <div className='mr-0 ml-auto'>
-                  <Button variant='default' disabled={loading}>
-                    {loading && <Spinner data-icon='inline-start' />}
-                    Generate Costing Request
-                  </Button>
-                </div>
-              </div>
-            </Form>
-          </CardContent>
-        </Card>
-      </Container>
-    </>
+            </div>
+
+            {/* Bottom Total Actions */}
+            <div className='mt-6 pt-4 border-t border-gray-200 space-y-3'>
+              {/* <button className='w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm py-2 rounded'>
+              Recalculate Totals
+            </button> */}
+              <button className='w-full bg-slate-800 hover:bg-slate-900 text-white text-xs py-2.5 rounded flex flex-col items-center justify-center'>
+                <span className='font-semibold'>
+                  {costingLoading
+                    ? 'Calculating Please Wait...'
+                    : 'Generate Costing Request'}
+                </span>
+                <span className='text-[10px] text-gray-400'>
+                  Estimated Cost: $9,300.20
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
   );
 };
