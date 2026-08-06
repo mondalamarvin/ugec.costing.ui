@@ -24,4 +24,5 @@ export interface IInputErrors {
   processRoute?: boolean;
   material?: boolean;
   vehicle?: boolean;
+  machineType?: boolean;
 }

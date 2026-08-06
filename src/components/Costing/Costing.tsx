@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   DndContext,
@@ -59,6 +59,8 @@ import {
   selectCategories,
 } from '../../store/slices/materialSlice';
 
+import { fetchMachines, selectMachines } from '../../store/slices/machineSlice';
+
 import {
   generateCostingRequest,
   selectCostingLoading,
@@ -82,9 +84,10 @@ import type {
 } from '../../global/interfaces';
 
 // --- Types ---
-interface MachineItem {
-  value: number;
-  label: string;
+interface IMachineItem {
+  id: number;
+  name: string;
+  stepOrder: number;
 }
 
 interface ComponentItem {
@@ -107,17 +110,7 @@ interface ICategoryOption {
   category: string;
 }
 
-const machineOptions = [
-  {
-    value: 1,
-    label: 'Bobst CL750 D1350/450 Laminating Machine (without LPG)',
-    order: 0,
-  },
-  { value: 2, label: 'New Web Control Jumbo (Rewinding)' },
-  { value: 3, label: 'Rotopak 888 1200/300C' },
-  { value: 4, label: 'Automatic Punching' },
-  { value: 5, label: 'Dayuan' },
-];
+const defaultMachines = [{ machineId: 1 }, { machineId: 2 }];
 
 const layerOprions = [
   {
@@ -208,9 +201,9 @@ const layerOprions = [
 
 const orderTypeOptions = [{ value: 'Conesleeves', label: 'Conesleeves' }];
 
-export const mapToProcessRoute = (items: readonly ISelect[]) => {
+export const mapToProcessRoute = (items: IMachineItem[]) => {
   return items.map((item, index) => ({
-    machineId: Number(item.value),
+    machineId: Number(item.id),
     stepOrder: index + 1,
   }));
 };
@@ -222,16 +215,15 @@ export const Costing = () => {
   const [expandedLayer, setExpandedLayer] = useState<number | null>(4);
   const [expandedComp, setExpandedComp] = useState<number | null>(3);
   const [layers, setLayers] = useState<ILayers[]>(layerOprions);
-  const [machines, setMachines] = useState<MachineItem[]>(
-    machineOptions.map((m, idx) => ({
-      ...m,
-      stepOrder: idx + 1,
-    })),
-  );
+  const [layerType, setLayerType] = useState<number>(0);
+  const [machines, setMachines] = useState<IMachineItem[]>([]);
+  const [machineType, setMachineType] = useState<number>(0);
   const [netRollWidth, setNetRollWidth] = useState<number>(559.71);
   const [noOfColors, setNoOfColors] = useState<number>(8);
   const [noOfOuts, setNoOfOuts] = useState<number>(4);
   const [noOfUps, setNoOfUps] = useState<number>(3);
+  const [openAddMachineSheet, setOpenAddMachineSheet] =
+    useState<boolean>(false);
   const [orderType, setOrderType] = useState<string>('');
   const [quantityOrder, setQuantityOrder] = useState<number>(2000000);
   const [repeatLength, setRepeatLength] = useState<number>(533.05);
@@ -243,11 +235,34 @@ export const Costing = () => {
 
   const dispatch = useDispatch<AppDispatch>();
   const materialCategories = useSelector(selectCategories);
+  const machineOptions = useSelector(selectMachines);
   const costingLoading = useSelector(selectCostingLoading);
+
+  useEffect(() => {
+    dispatch(fetchMachines());
+  }, [dispatch]);
 
   useEffect(() => {
     dispatch(fetchMaterialCategories());
   }, [dispatch]);
+
+  useEffect(() => {
+    if (machineOptions && machineOptions.length > 0) {
+      const initializedMachines = defaultMachines.map((item, idx) => {
+        const matched = (machineOptions as IMachineItem[]).find(
+          (o) => o.id === item.machineId,
+        );
+
+        return {
+          id: item.machineId,
+          name: matched?.name ?? `Machine #${item.machineId}`,
+          stepOrder: idx + 1,
+        };
+      });
+
+      setMachines(initializedMachines);
+    }
+  }, [machineOptions]);
 
   useEffect(() => {
     if (materialCategories) {
@@ -262,18 +277,32 @@ export const Costing = () => {
     }),
   );
 
+  const selectMachineOptions = useMemo(() => {
+    if (!machineOptions) return [];
+    const selectedIds = new Set(machines.map((m) => m.id));
+
+    return (machineOptions as IMachineItem[])
+      .filter((m) => !selectedIds.has(m.id))
+      .map((m) => ({
+        value: m.id,
+        label: m.name,
+      }));
+  }, [machineOptions, machines]);
+
+  console.log('[[Machines]]', machineType);
+
   const handleMachineDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
     if (!over || active.id === over.id) return;
 
     setMachines((prevMachines) => {
-      const oldIndex = prevMachines.findIndex((m) => m.value === active.id);
-      const newIndex = prevMachines.findIndex((m) => m.value === over.id);
-      const reordered = arrayMove(prevMachines, oldIndex, newIndex);
+      const oldIndex = prevMachines.findIndex((m) => m.id === active.id);
+      const newIndex = prevMachines.findIndex((m) => m.id === over.id);
+      const reordered = arrayMove(prevMachines, oldIndex ?? 0, newIndex ?? 0);
       return reordered.map((machine, index) => ({
         ...machine,
-        stepOrder: index,
+        stepOrder: index + 1,
       }));
     });
   };
@@ -293,6 +322,31 @@ export const Costing = () => {
       }));
     });
   };
+
+  const addLayerClickHandler = useCallback(
+    (id: number) => {
+      if (!id) return;
+      const optionToAdd = (machineOptions as IMachineItem[])?.find(
+        (m) => m.id === id,
+      );
+
+      if (!optionToAdd) return;
+      setMachines((prev) => {
+        if (prev.some((m) => m.id === id)) return prev;
+
+        return [
+          ...prev,
+          {
+            ...optionToAdd,
+            machineId: optionToAdd.id,
+            stepOrder: prev.length + 1,
+          },
+        ];
+      });
+      setOpenAddMachineSheet(false);
+    },
+    [machineOptions],
+  );
 
   const submitCostingHandler = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -317,561 +371,624 @@ export const Costing = () => {
   };
 
   return (
-    <div className='min-h-screen bg-slate-100 p-6 text-gray-800'>
-      {/* Title Bar */}
-      <div className='mb-6'>
-        <h1 className='text-2xl font-bold text-gray-900'>
-          Costing App: Advanced Calculator
-        </h1>
-        <p className='text-sm text-gray-500'>
-          Dashboard / Calculator /{' '}
-          <span className='text-gray-800 font-medium'>New</span>
-        </p>
-      </div>
-
-      {/* Main Grid: Left 2 cols, Right 1 col */}
-      <form onSubmit={submitCostingHandler}>
-        <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
-          {/* LEFT COLUMN */}
-          <div className='lg:col-span-2 space-y-6'>
-            {/* Section 1: Job Overview & Imposition */}
-            <div className='bg-white p-5 rounded-lg border border-gray-200 shadow-sm'>
-              <h2 className='text-lg font-bold text-gray-800 mb-4'>
-                Job Overview & Imposition
-              </h2>
-
-              <div className='grid grid-cols-2 sm:grid-cols-8 gap-4'>
-                <div className='col-span-2'>
-                  <label
-                    htmlFor='orderType'
-                    className={classNames(
-                      'block text-xs font-semibold text-gray-600 mb-2',
-                      errors.orderType ? 'text-red-600' : 'text-gray-900',
-                    )}
-                  >
-                    Order Type
-                  </label>
-                  <Select<ISelect>
-                    classNames={{
-                      control: () => '!min-h-8 !h-8 rounded-md !border-input',
-                      valueContainer: () => '!py-0 !h-full',
-                      indicatorsContainer: () => '!h-full',
-                      input: () => '!m-0 !p-0',
-                    }}
-                    id='orderType'
-                    options={orderTypeOptions}
-                    onChange={(order) =>
-                      setSingleSelectState(
-                        setOrderType,
-                        setErrors,
-                        'orderType',
-                        order,
-                      )
-                    }
-                    styles={customErrorStyle('orderType', errors.orderType)}
-                  />
-                </div>
-
-                <div className='col-span-2'>
-                  <Field data-invalid={errors && errors.quantityOrder}>
-                    <FieldLabel
-                      htmlFor='quantityOrder'
-                      className='block text-xs font-semibold text-gray-600 mb-0'
-                    >
-                      Quantity
-                    </FieldLabel>
-                    <Input
-                      className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
-                      name='quantityOrder'
-                      type='number'
-                      onChange={(e) =>
-                        setInputState(
-                          e,
-                          setQuantityOrder,
-                          setErrors,
-                          'quantityOrder',
-                        )
-                      }
-                      value={quantityOrder}
-                      aria-invalid={errors && errors.quantityOrder}
-                    />
-                  </Field>
-                </div>
-                <div className='col-span-2'>
-                  <Field data-invalid={errors && errors.noOfColors}>
-                    <FieldLabel
-                      htmlFor='noOfColors'
-                      className='block text-xs font-semibold text-gray-600 mb-0'
-                    >
-                      Number Of Colors
-                    </FieldLabel>
-                    <Input
-                      className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
-                      name='noOfColors'
-                      type='number'
-                      onChange={(e) =>
-                        setInputState(e, setNoOfColors, setErrors, 'noOfColors')
-                      }
-                      value={noOfColors}
-                      aria-invalid={errors && errors.noOfColors}
-                    />
-                  </Field>
-                </div>
-                <div className='col-span-2'>
-                  <Field data-invalid={errors && errors.spreadWidth}>
-                    <FieldLabel
-                      htmlFor='spreadWidth'
-                      className='block text-xs font-semibold text-gray-600 mb-0'
-                    >
-                      Spread Width
-                    </FieldLabel>
-                    <Input
-                      className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
-                      name='spreadWidth'
-                      type='number'
-                      onChange={(e) =>
-                        setInputState(
-                          e,
-                          setSpreadWidth,
-                          setErrors,
-                          'spreadWidth',
-                        )
-                      }
-                      value={spreadWidth}
-                      aria-invalid={errors && errors.spreadWidth}
-                    />
-                  </Field>
-                </div>
-                <div className='col-span-2'>
-                  <Field data-invalid={errors && errors.spreadHeight}>
-                    <FieldLabel
-                      htmlFor='spreadHeight'
-                      className='block text-xs font-semibold text-gray-600 mb-0'
-                    >
-                      Spread Height
-                    </FieldLabel>
-                    <Input
-                      className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
-                      name='spreadHeight'
-                      type='number'
-                      onChange={(e) =>
-                        setInputState(
-                          e,
-                          setSpreadHeight,
-                          setErrors,
-                          'spreadHeight',
-                        )
-                      }
-                      value={spreadHeight}
-                      aria-invalid={errors && errors.spreadHeight}
-                    />
-                  </Field>
-                </div>
-                <div className='col-span-2'>
-                  <Field data-invalid={errors && errors.noOfUps}>
-                    <FieldLabel
-                      htmlFor='noOfUps'
-                      className='block text-xs font-semibold text-gray-600 mb-0'
-                    >
-                      Number Of Ups
-                    </FieldLabel>
-                    <Input
-                      className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
-                      name='noOfUps'
-                      type='number'
-                      onChange={(e) =>
-                        setInputState(e, setNoOfUps, setErrors, 'noOfUps')
-                      }
-                      value={noOfUps}
-                      aria-invalid={errors && errors.noOfUps}
-                    />
-                  </Field>
-                </div>
-                <div className='col-span-2'>
-                  <Field data-invalid={errors && errors.noOfOuts}>
-                    <FieldLabel
-                      htmlFor='noOfOuts'
-                      className='block text-xs font-semibold text-gray-600 mb-0'
-                    >
-                      Number Of Outs
-                    </FieldLabel>
-                    <Input
-                      className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
-                      name='noOfOuts'
-                      type='number'
-                      onChange={(e) =>
-                        setInputState(e, setNoOfOuts, setErrors, 'noOfOuts')
-                      }
-                      value={noOfOuts}
-                      aria-invalid={errors && errors.noOfOuts}
-                    />
-                  </Field>
-                </div>
-                <div className='col-span-2'>
-                  <Field data-invalid={errors && errors.netRollWidth}>
-                    <FieldLabel
-                      htmlFor='netRollWidth'
-                      className='block text-xs font-semibold text-gray-600 mb-0'
-                    >
-                      Net Roll Width
-                    </FieldLabel>
-                    <Input
-                      className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
-                      name='netRollWidth'
-                      type='number'
-                      onChange={(e) =>
-                        setInputState(
-                          e,
-                          setNetRollWidth,
-                          setErrors,
-                          'netRollWidth',
-                        )
-                      }
-                      value={netRollWidth}
-                      aria-invalid={errors && errors.netRollWidth}
-                    />
-                  </Field>
-                </div>
-                <div className='col-span-2'>
-                  <Field data-invalid={errors && errors.repeatLength}>
-                    <FieldLabel
-                      htmlFor='repeatLength'
-                      className='block text-xs font-semibold text-gray-600 mb-0'
-                    >
-                      Repeat Length
-                    </FieldLabel>
-                    <Input
-                      className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
-                      name='repeatLength'
-                      type='number'
-                      onChange={(e) =>
-                        setInputState(
-                          e,
-                          setRepeatLength,
-                          setErrors,
-                          'repeatLength',
-                        )
-                      }
-                      value={repeatLength}
-                      aria-invalid={errors && errors.repeatLength}
-                    />
-                  </Field>
-                </div>
-                <div className='col-span-2'>
-                  <Field data-invalid={errors && errors.totalImages}>
-                    <FieldLabel
-                      htmlFor='totalImages'
-                      className='block text-xs font-semibold text-gray-600 mb-0'
-                    >
-                      Total Images
-                    </FieldLabel>
-                    <Input
-                      className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
-                      name='totalImages'
-                      type='number'
-                      onChange={(e) =>
-                        setInputState(
-                          e,
-                          setTotalImages,
-                          setErrors,
-                          'totalImages',
-                        )
-                      }
-                      value={totalImages}
-                      aria-invalid={errors && errors.totalImages}
-                    />
-                  </Field>
-                </div>
-                <div className='col-span-2'>
-                  <Field data-invalid={errors && errors.pcsPerBox}>
-                    <FieldLabel
-                      htmlFor='pcsPerBox'
-                      className='block text-xs font-semibold text-gray-600 mb-0'
-                    >
-                      Pcs/Box
-                    </FieldLabel>
-                    <Input
-                      className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
-                      name='pcsPerBox'
-                      type='number'
-                      onChange={(e) =>
-                        setInputState(e, setPcsPerBox, setErrors, 'pcsPerBox')
-                      }
-                      value={pcsPerBox}
-                      aria-invalid={errors && errors.pcsPerBox}
-                    />
-                  </Field>
-                </div>
-                <div className='col-span-2'>
-                  <Field data-invalid={errors && errors.vehicle}>
-                    <FieldLabel
-                      htmlFor='vehicle'
-                      className='block text-xs font-semibold text-gray-600 mb-0'
-                    >
-                      Vehicle
-                    </FieldLabel>
-                    <Input
-                      className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
-                      name='vehicle'
-                      placeholder='L300'
-                      onChange={(e) =>
-                        setInputState(e, setVehicle, setErrors, 'vehicle')
-                      }
-                      value={vehicle}
-                      aria-invalid={errors && errors.vehicle}
-                    />
-                  </Field>
-                </div>
+    <>
+      <Sheet open={openAddMachineSheet} onOpenChange={setOpenAddMachineSheet}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Add New Layer</SheetTitle>
+            <SheetDescription>
+              {/* Type: {layerOptions[selectedLayerIndex].type} */}
+            </SheetDescription>
+          </SheetHeader>
+          <Container>
+            <div className='grid gap-6 mb-4 lg:grid-cols-0'>
+              <div>
+                <label
+                  htmlFor='machineType'
+                  className={classNames(
+                    'block mb-2 text-sm font-medium',
+                    errors.machineType ? 'text-red-600' : 'text-gray-900',
+                  )}
+                >
+                  Machine Name
+                </label>
+                <Select<ISelect>
+                  id='machineType'
+                  options={selectMachineOptions}
+                  onChange={(type) => {
+                    setSingleSelectState(
+                      setMachineType,
+                      setErrors,
+                      'machineType',
+                      type,
+                    );
+                  }}
+                  styles={customErrorStyle('machineType', errors.layerType)}
+                />
               </div>
             </div>
-
-            {/* Section 2: Process Routing (Step Sequencer) */}
-            <div className='bg-white p-5 rounded-lg border border-gray-200 shadow-sm'>
-              <div className='flex items-center justify-between mb-4'>
-                <div>
-                  <h2 className='text-md font-bold text-gray-800'>
-                    Process Routing (Step Sequencer)
-                  </h2>
-                  <p className='text-xs text-gray-400'>(Draggable Stack)</p>
-                </div>
-                <button className='flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-3 py-1.5 rounded'>
-                  <Plus className='w-3.5 h-3.5' /> Add Machine
-                </button>
-              </div>
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleMachineDragEnd}
+            <div className='py-4'>
+              <Button
+                type='button'
+                className='py-4'
+                onClick={() => addLayerClickHandler(machineType)}
               >
-                <SortableContext
-                  items={machines.map((r) => r.value)}
-                  strategy={verticalListSortingStrategy}
-                >
-                  {machines.map((machine, index) => (
-                    <SortableItem key={machine.value} id={machine.value}>
-                      {({ dragHandleProps }) => (
-                        /* Custom Machine Row Design */
-                        <div className='flex items-center justify-between p-3 bg-white border border-gray-200 rounded-md mb-2 shadow-sm'>
-                          <div className='flex items-center gap-3'>
-                            {/* Drag Handle Button */}
-                            <button
-                              type='button'
-                              {...dragHandleProps.attributes}
-                              {...dragHandleProps.listeners}
-                              className='cursor-grab text-gray-400 hover:text-gray-600 p-1'
-                            >
-                              <GripVertical className='w-4 h-4' />
-                            </button>
-                            <span className='font-bold text-gray-700'>
-                              {index + 1}
-                            </span>
-                            <span className='font-semibold text-gray-800'>
-                              {machine.label}
-                            </span>
-                          </div>
+                Add To Process Routing
+              </Button>
+            </div>
+          </Container>
+        </SheetContent>
+      </Sheet>
+      <div className='min-h-screen bg-slate-100 p-6 text-gray-800'>
+        {/* Title Bar */}
+        <div className='mb-6'>
+          <h1 className='text-2xl font-bold text-gray-900'>
+            Costing App: Advanced Calculator
+          </h1>
+          <p className='text-sm text-gray-500'>
+            Dashboard / Calculator /{' '}
+            <span className='text-gray-800 font-medium'>New</span>
+          </p>
+        </div>
 
-                          {/* <div className='flex items-center gap-2'>
+        {/* Main Grid: Left 2 cols, Right 1 col */}
+        <form onSubmit={submitCostingHandler}>
+          <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
+            {/* LEFT COLUMN */}
+            <div className='lg:col-span-2 space-y-6'>
+              {/* Section 1: Job Overview & Imposition */}
+              <div className='bg-white p-5 rounded-lg border border-gray-200 shadow-sm'>
+                <h2 className='text-lg font-bold text-gray-800 mb-4'>
+                  Job Overview & Imposition
+                </h2>
+
+                <div className='grid grid-cols-2 sm:grid-cols-8 gap-4'>
+                  <div className='col-span-2'>
+                    <label
+                      htmlFor='orderType'
+                      className={classNames(
+                        'block text-xs font-semibold text-gray-600 mb-2',
+                        errors.orderType ? 'text-red-600' : 'text-gray-900',
+                      )}
+                    >
+                      Order Type
+                    </label>
+                    <Select<ISelect>
+                      classNames={{
+                        control: () => '!min-h-8 !h-8 rounded-md !border-input',
+                        valueContainer: () => '!py-0 !h-full',
+                        indicatorsContainer: () => '!h-full',
+                        input: () => '!m-0 !p-0',
+                      }}
+                      id='orderType'
+                      options={orderTypeOptions}
+                      onChange={(order) =>
+                        setSingleSelectState(
+                          setOrderType,
+                          setErrors,
+                          'orderType',
+                          order,
+                        )
+                      }
+                      styles={customErrorStyle('orderType', errors.orderType)}
+                    />
+                  </div>
+
+                  <div className='col-span-2'>
+                    <Field data-invalid={errors && errors.quantityOrder}>
+                      <FieldLabel
+                        htmlFor='quantityOrder'
+                        className='block text-xs font-semibold text-gray-600 mb-0'
+                      >
+                        Quantity
+                      </FieldLabel>
+                      <Input
+                        className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
+                        name='quantityOrder'
+                        type='number'
+                        onChange={(e) =>
+                          setInputState(
+                            e,
+                            setQuantityOrder,
+                            setErrors,
+                            'quantityOrder',
+                          )
+                        }
+                        value={quantityOrder}
+                        aria-invalid={errors && errors.quantityOrder}
+                      />
+                    </Field>
+                  </div>
+                  <div className='col-span-2'>
+                    <Field data-invalid={errors && errors.noOfColors}>
+                      <FieldLabel
+                        htmlFor='noOfColors'
+                        className='block text-xs font-semibold text-gray-600 mb-0'
+                      >
+                        Number Of Colors
+                      </FieldLabel>
+                      <Input
+                        className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
+                        name='noOfColors'
+                        type='number'
+                        onChange={(e) =>
+                          setInputState(
+                            e,
+                            setNoOfColors,
+                            setErrors,
+                            'noOfColors',
+                          )
+                        }
+                        value={noOfColors}
+                        aria-invalid={errors && errors.noOfColors}
+                      />
+                    </Field>
+                  </div>
+                  <div className='col-span-2'>
+                    <Field data-invalid={errors && errors.spreadWidth}>
+                      <FieldLabel
+                        htmlFor='spreadWidth'
+                        className='block text-xs font-semibold text-gray-600 mb-0'
+                      >
+                        Spread Width
+                      </FieldLabel>
+                      <Input
+                        className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
+                        name='spreadWidth'
+                        type='number'
+                        onChange={(e) =>
+                          setInputState(
+                            e,
+                            setSpreadWidth,
+                            setErrors,
+                            'spreadWidth',
+                          )
+                        }
+                        value={spreadWidth}
+                        aria-invalid={errors && errors.spreadWidth}
+                      />
+                    </Field>
+                  </div>
+                  <div className='col-span-2'>
+                    <Field data-invalid={errors && errors.spreadHeight}>
+                      <FieldLabel
+                        htmlFor='spreadHeight'
+                        className='block text-xs font-semibold text-gray-600 mb-0'
+                      >
+                        Spread Height
+                      </FieldLabel>
+                      <Input
+                        className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
+                        name='spreadHeight'
+                        type='number'
+                        onChange={(e) =>
+                          setInputState(
+                            e,
+                            setSpreadHeight,
+                            setErrors,
+                            'spreadHeight',
+                          )
+                        }
+                        value={spreadHeight}
+                        aria-invalid={errors && errors.spreadHeight}
+                      />
+                    </Field>
+                  </div>
+                  <div className='col-span-2'>
+                    <Field data-invalid={errors && errors.noOfUps}>
+                      <FieldLabel
+                        htmlFor='noOfUps'
+                        className='block text-xs font-semibold text-gray-600 mb-0'
+                      >
+                        Number Of Ups
+                      </FieldLabel>
+                      <Input
+                        className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
+                        name='noOfUps'
+                        type='number'
+                        onChange={(e) =>
+                          setInputState(e, setNoOfUps, setErrors, 'noOfUps')
+                        }
+                        value={noOfUps}
+                        aria-invalid={errors && errors.noOfUps}
+                      />
+                    </Field>
+                  </div>
+                  <div className='col-span-2'>
+                    <Field data-invalid={errors && errors.noOfOuts}>
+                      <FieldLabel
+                        htmlFor='noOfOuts'
+                        className='block text-xs font-semibold text-gray-600 mb-0'
+                      >
+                        Number Of Outs
+                      </FieldLabel>
+                      <Input
+                        className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
+                        name='noOfOuts'
+                        type='number'
+                        onChange={(e) =>
+                          setInputState(e, setNoOfOuts, setErrors, 'noOfOuts')
+                        }
+                        value={noOfOuts}
+                        aria-invalid={errors && errors.noOfOuts}
+                      />
+                    </Field>
+                  </div>
+                  <div className='col-span-2'>
+                    <Field data-invalid={errors && errors.netRollWidth}>
+                      <FieldLabel
+                        htmlFor='netRollWidth'
+                        className='block text-xs font-semibold text-gray-600 mb-0'
+                      >
+                        Net Roll Width
+                      </FieldLabel>
+                      <Input
+                        className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
+                        name='netRollWidth'
+                        type='number'
+                        onChange={(e) =>
+                          setInputState(
+                            e,
+                            setNetRollWidth,
+                            setErrors,
+                            'netRollWidth',
+                          )
+                        }
+                        value={netRollWidth}
+                        aria-invalid={errors && errors.netRollWidth}
+                      />
+                    </Field>
+                  </div>
+                  <div className='col-span-2'>
+                    <Field data-invalid={errors && errors.repeatLength}>
+                      <FieldLabel
+                        htmlFor='repeatLength'
+                        className='block text-xs font-semibold text-gray-600 mb-0'
+                      >
+                        Repeat Length
+                      </FieldLabel>
+                      <Input
+                        className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
+                        name='repeatLength'
+                        type='number'
+                        onChange={(e) =>
+                          setInputState(
+                            e,
+                            setRepeatLength,
+                            setErrors,
+                            'repeatLength',
+                          )
+                        }
+                        value={repeatLength}
+                        aria-invalid={errors && errors.repeatLength}
+                      />
+                    </Field>
+                  </div>
+                  <div className='col-span-2'>
+                    <Field data-invalid={errors && errors.totalImages}>
+                      <FieldLabel
+                        htmlFor='totalImages'
+                        className='block text-xs font-semibold text-gray-600 mb-0'
+                      >
+                        Total Images
+                      </FieldLabel>
+                      <Input
+                        className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
+                        name='totalImages'
+                        type='number'
+                        onChange={(e) =>
+                          setInputState(
+                            e,
+                            setTotalImages,
+                            setErrors,
+                            'totalImages',
+                          )
+                        }
+                        value={totalImages}
+                        aria-invalid={errors && errors.totalImages}
+                      />
+                    </Field>
+                  </div>
+                  <div className='col-span-2'>
+                    <Field data-invalid={errors && errors.pcsPerBox}>
+                      <FieldLabel
+                        htmlFor='pcsPerBox'
+                        className='block text-xs font-semibold text-gray-600 mb-0'
+                      >
+                        Pcs/Box
+                      </FieldLabel>
+                      <Input
+                        className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
+                        name='pcsPerBox'
+                        type='number'
+                        onChange={(e) =>
+                          setInputState(e, setPcsPerBox, setErrors, 'pcsPerBox')
+                        }
+                        value={pcsPerBox}
+                        aria-invalid={errors && errors.pcsPerBox}
+                      />
+                    </Field>
+                  </div>
+                  <div className='col-span-2'>
+                    <Field data-invalid={errors && errors.vehicle}>
+                      <FieldLabel
+                        htmlFor='vehicle'
+                        className='block text-xs font-semibold text-gray-600 mb-0'
+                      >
+                        Vehicle
+                      </FieldLabel>
+                      <Input
+                        className='w-full h-8 border border-gray-300 rounded-sm px-3 text-sm font-semibold'
+                        name='vehicle'
+                        placeholder='L300'
+                        onChange={(e) =>
+                          setInputState(e, setVehicle, setErrors, 'vehicle')
+                        }
+                        value={vehicle}
+                        aria-invalid={errors && errors.vehicle}
+                      />
+                    </Field>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2: Process Routing (Step Sequencer) */}
+              <div className='bg-white p-5 rounded-lg border border-gray-200 shadow-sm'>
+                <div className='flex items-center justify-between mb-4'>
+                  <div>
+                    <h2 className='text-md font-bold text-gray-800'>
+                      Process Routing (Step Sequencer)
+                    </h2>
+                    <p className='text-xs text-gray-400'>(Draggable Stack)</p>
+                  </div>
+                  <Button
+                    type='button'
+                    onClick={() => setOpenAddMachineSheet(!openAddMachineSheet)}
+                    className='flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-3 py-1.5 rounded'
+                  >
+                    <Plus className='w-3.5 h-3.5' /> Add Machine
+                  </Button>
+                </div>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleMachineDragEnd}
+                >
+                  <SortableContext
+                    items={machines.map((r) => r.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {machines.map((machine, index) => (
+                      <SortableItem key={machine.id} id={machine.id}>
+                        {({ dragHandleProps }) => (
+                          /* Custom Machine Row Design */
+                          <div className='flex items-center justify-between p-3 bg-white border border-gray-200 rounded-md mb-2 shadow-sm'>
+                            <div className='flex items-center gap-3'>
+                              {/* Drag Handle Button */}
+                              <button
+                                type='button'
+                                {...dragHandleProps.attributes}
+                                {...dragHandleProps.listeners}
+                                className='cursor-grab text-gray-400 hover:text-gray-600 p-1'
+                              >
+                                <GripVertical className='w-4 h-4' />
+                              </button>
+                              <span className='font-bold text-gray-700'>
+                                {index + 1}
+                              </span>
+                              <span className='font-semibold text-gray-800'>
+                                {machine.name}
+                              </span>
+                            </div>
+
+                            {/* <div className='flex items-center gap-2'>
                           <button onClick={() => editMachine(route.id)}>
                             <Edit2 className='w-4 h-4 text-gray-400' />
                           </button>
                         </div> */}
-                        </div>
-                      )}
-                    </SortableItem>
-                  ))}
-                </SortableContext>
-              </DndContext>
-            </div>
-
-            {/* Section 3: Packaging Materials */}
-            <div className='bg-white p-5 rounded-lg border border-gray-200 shadow-sm'>
-              <h2 className='text-lg font-bold text-gray-800 mb-2'>
-                Packaging Materials & Total Cost
-              </h2>
-              <p className='text-xs text-gray-500'>
-                Final Assembly & Packaging: Boxes (5000 units, [Mat ID 221])
-              </p>
-            </div>
-          </div>
-
-          {/* RIGHT COLUMN */}
-          <div className='bg-white p-5 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between'>
-            <div>
-              <div className='flex items-center justify-between mb-4'>
-                <div>
-                  <h2 className='text-md font-bold text-gray-800'>
-                    Substrate & Coating Layers
-                  </h2>
-                  <p className='text-xs text-gray-400'>(Draggable Stack)</p>
-                </div>
-                <button className='flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-3 py-1.5 rounded'>
-                  <Plus className='w-3.5 h-3.5' /> Add Layer
-                </button>
-              </div>
-
-              {/* Draggable & Hierarchical Layer Stack */}
-              <div className='space-y-2'>
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handleLayerDragEnd}
-                >
-                  <SortableContext
-                    items={layers && layers.map((l) => l.id)}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    {layers.map((layer, index) => {
-                      const isExpanded = expandedLayer === layer.id;
-
-                      return (
-                        <SortableItem key={layer.id} id={layer.id}>
-                          {({ dragHandleProps }) => (
-                            <div className='border border-gray-200 rounded-md overflow-hidden bg-white mb-2'>
-                              {/* Layer Header */}
-                              <div
-                                className={`flex items-center justify-between p-3 cursor-pointer text-sm font-semibold ${
-                                  isExpanded
-                                    ? 'bg-gray-100 border-b border-gray-200'
-                                    : 'bg-gray-50 hover:bg-gray-100'
-                                }`}
-                                onClick={() =>
-                                  setExpandedLayer(
-                                    isExpanded ? null : layer?.id,
-                                  )
-                                }
-                              >
-                                <div className='flex items-center gap-2'>
-                                  {/* Attached dragHandleProps & e.stopPropagation() */}
-                                  <button
-                                    type='button'
-                                    {...dragHandleProps.attributes}
-                                    {...dragHandleProps.listeners}
-                                    className='cursor-grab text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-200/50'
-                                    onClick={(e) => e.stopPropagation()} // Stops accordion toggling on drag
-                                  >
-                                    <GripVertical className='w-4 h-4 text-gray-400' />
-                                  </button>
-                                  <span className='font-bold text-gray-700'>
-                                    Layer {index + 1}
-                                  </span>
-                                  <span className='font-semibold text-gray-800'>
-                                    {layer.name}
-                                  </span>
-                                </div>
-
-                                {layer.components &&
-                                  (isExpanded ? (
-                                    <ChevronDown className='w-4 h-4 text-gray-500' />
-                                  ) : (
-                                    <ChevronRight className='w-4 h-4 text-gray-500' />
-                                  ))}
-                              </div>
-
-                              {!isExpanded && layer.components && (
-                                <div className='p-3 bg-gray-50/50 space-y-3'>
-                                  <div className='flex justify-between items-center text-xs text-gray-500 border-b pb-2'>
-                                    <span>
-                                      Formula{' '}
-                                      {layer.name
-                                        .split('[')[1]
-                                        ?.replace(']', '') || ''}
-                                    </span>
-                                    <div>
-                                      <span className='mr-3'>
-                                        Coverage <b>{layer.coveragePercent}</b>
-                                      </span>
-                                      <span>
-                                        TNVC <b>{layer.tnvc}</b>
-                                      </span>
-                                    </div>
-                                  </div>
-
-                                  <div className='pl-2 space-y-2 text-xs'>
-                                    {layer.components.map((comp) => {
-                                      const isCompExpanded =
-                                        expandedComp === comp.materialId;
-                                      return (
-                                        <div
-                                          key={comp.materialId}
-                                          className='rounded border border-gray-200 bg-white p-2'
-                                        >
-                                          <div
-                                            className='flex items-center gap-1 cursor-pointer font-medium text-gray-700'
-                                            onClick={() =>
-                                              setExpandedComp(
-                                                isCompExpanded
-                                                  ? null
-                                                  : comp.materialId,
-                                              )
-                                            }
-                                          >
-                                            {comp.subComponents ? (
-                                              isCompExpanded ? (
-                                                <ChevronDown className='w-3 h-3' />
-                                              ) : (
-                                                <ChevronRight className='w-3 h-3' />
-                                              )
-                                            ) : (
-                                              <span className='w-3' />
-                                            )}
-                                            <span>{comp.materialId}</span>
-                                          </div>
-
-                                          {isCompExpanded &&
-                                            comp.subComponents && (
-                                              <div className='mt-2 pl-6 space-y-1 text-gray-600 bg-gray-50 p-2 rounded'>
-                                                {comp.subComponents.map(
-                                                  (sub, i) => (
-                                                    <div
-                                                      key={i}
-                                                      className='flex justify-between'
-                                                    >
-                                                      <span>
-                                                        {sub.materialId}
-                                                      </span>
-                                                      <span className='font-semibold text-gray-800'>
-                                                        {sub.tnvc}
-                                                      </span>
-                                                    </div>
-                                                  ),
-                                                )}
-                                              </div>
-                                            )}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </SortableItem>
-                      );
-                    })}
+                          </div>
+                        )}
+                      </SortableItem>
+                    ))}
                   </SortableContext>
                 </DndContext>
               </div>
+
+              {/* Section 3: Packaging Materials */}
+              <div className='bg-white p-5 rounded-lg border border-gray-200 shadow-sm'>
+                <h2 className='text-lg font-bold text-gray-800 mb-2'>
+                  Packaging Materials & Total Cost
+                </h2>
+                <p className='text-xs text-gray-500'>
+                  Final Assembly & Packaging: Boxes (5000 units, [Mat ID 221])
+                </p>
+              </div>
             </div>
 
-            {/* Bottom Total Actions */}
-            <div className='mt-6 pt-4 border-t border-gray-200 space-y-3'>
-              {/* <button className='w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm py-2 rounded'>
+            {/* RIGHT COLUMN */}
+            <div className='bg-white p-5 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between'>
+              <div>
+                <div className='flex items-center justify-between mb-4'>
+                  <div>
+                    <h2 className='text-md font-bold text-gray-800'>
+                      Substrate & Coating Layers
+                    </h2>
+                    <p className='text-xs text-gray-400'>(Draggable Stack)</p>
+                  </div>
+                  <Button className='flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-3 py-1.5 rounded'>
+                    <Plus className='w-3.5 h-3.5' /> Add Layer
+                  </Button>
+                </div>
+
+                {/* Draggable & Hierarchical Layer Stack */}
+                <div className='space-y-2'>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleLayerDragEnd}
+                  >
+                    <SortableContext
+                      items={layers && layers.map((l) => l.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {layers.map((layer, index) => {
+                        const isExpanded = expandedLayer === layer.id;
+
+                        return (
+                          <SortableItem key={layer.id} id={layer.id}>
+                            {({ dragHandleProps }) => (
+                              <div className='border border-gray-200 rounded-md overflow-hidden bg-white mb-2'>
+                                {/* Layer Header */}
+                                <div
+                                  className={`flex items-center justify-between p-3 cursor-pointer text-sm font-semibold ${
+                                    isExpanded
+                                      ? 'bg-gray-100 border-b border-gray-200'
+                                      : 'bg-gray-50 hover:bg-gray-100'
+                                  }`}
+                                  onClick={() =>
+                                    setExpandedLayer(
+                                      isExpanded ? null : layer?.id,
+                                    )
+                                  }
+                                >
+                                  <div className='flex items-center gap-2'>
+                                    {/* Attached dragHandleProps & e.stopPropagation() */}
+                                    <button
+                                      type='button'
+                                      {...dragHandleProps.attributes}
+                                      {...dragHandleProps.listeners}
+                                      className='cursor-grab text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-200/50'
+                                      onClick={(e) => e.stopPropagation()} // Stops accordion toggling on drag
+                                    >
+                                      <GripVertical className='w-4 h-4 text-gray-400' />
+                                    </button>
+                                    <span className='font-bold text-gray-700'>
+                                      Layer {index + 1}
+                                    </span>
+                                    <span className='font-semibold text-gray-800'>
+                                      {layer.name}
+                                    </span>
+                                  </div>
+
+                                  {layer.components &&
+                                    (isExpanded ? (
+                                      <ChevronDown className='w-4 h-4 text-gray-500' />
+                                    ) : (
+                                      <ChevronRight className='w-4 h-4 text-gray-500' />
+                                    ))}
+                                </div>
+
+                                {!isExpanded && layer.components && (
+                                  <div className='p-3 bg-gray-50/50 space-y-3'>
+                                    <div className='flex justify-between items-center text-xs text-gray-500 border-b pb-2'>
+                                      <span>
+                                        Formula{' '}
+                                        {layer.name
+                                          .split('[')[1]
+                                          ?.replace(']', '') || ''}
+                                      </span>
+                                      <div>
+                                        <span className='mr-3'>
+                                          Coverage{' '}
+                                          <b>{layer.coveragePercent}</b>
+                                        </span>
+                                        <span>
+                                          TNVC <b>{layer.tnvc}</b>
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    <div className='pl-2 space-y-2 text-xs'>
+                                      {layer.components.map((comp) => {
+                                        const isCompExpanded =
+                                          expandedComp === comp.materialId;
+                                        return (
+                                          <div
+                                            key={comp.materialId}
+                                            className='rounded border border-gray-200 bg-white p-2'
+                                          >
+                                            <div
+                                              className='flex items-center gap-1 cursor-pointer font-medium text-gray-700'
+                                              onClick={() =>
+                                                setExpandedComp(
+                                                  isCompExpanded
+                                                    ? null
+                                                    : comp.materialId,
+                                                )
+                                              }
+                                            >
+                                              {comp.subComponents ? (
+                                                isCompExpanded ? (
+                                                  <ChevronDown className='w-3 h-3' />
+                                                ) : (
+                                                  <ChevronRight className='w-3 h-3' />
+                                                )
+                                              ) : (
+                                                <span className='w-3' />
+                                              )}
+                                              <span>{comp.materialId}</span>
+                                            </div>
+
+                                            {isCompExpanded &&
+                                              comp.subComponents && (
+                                                <div className='mt-2 pl-6 space-y-1 text-gray-600 bg-gray-50 p-2 rounded'>
+                                                  {comp.subComponents.map(
+                                                    (sub, i) => (
+                                                      <div
+                                                        key={i}
+                                                        className='flex justify-between'
+                                                      >
+                                                        <span>
+                                                          {sub.materialId}
+                                                        </span>
+                                                        <span className='font-semibold text-gray-800'>
+                                                          {sub.tnvc}
+                                                        </span>
+                                                      </div>
+                                                    ),
+                                                  )}
+                                                </div>
+                                              )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </SortableItem>
+                        );
+                      })}
+                    </SortableContext>
+                  </DndContext>
+                </div>
+              </div>
+
+              {/* Bottom Total Actions */}
+              <div className='mt-6 pt-4 border-t border-gray-200 space-y-3'>
+                {/* <button className='w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm py-2 rounded'>
               Recalculate Totals
             </button> */}
-              <button className='w-full bg-slate-800 hover:bg-slate-900 text-white text-xs py-2.5 rounded flex flex-col items-center justify-center'>
-                <span className='font-semibold'>
-                  {costingLoading
-                    ? 'Calculating Please Wait...'
-                    : 'Generate Costing Request'}
-                </span>
-                <span className='text-[10px] text-gray-400'>
-                  Estimated Cost: $9,300.20
-                </span>
-              </button>
+                <Button
+                  type='submit'
+                  size='lg'
+                  className='w-full bg-slate-800 hover:bg-slate-900 text-white text-xs py-6.5 rounded flex flex-col items-center justify-center'
+                >
+                  <span className='font-semibold'>
+                    {costingLoading
+                      ? 'Calculating Please Wait...'
+                      : 'Generate Costing Request'}
+                  </span>
+                  <span className='text-[10px] text-gray-400'>
+                    Estimated Cost: $9,300.20
+                  </span>
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      </form>
-    </div>
+        </form>
+      </div>
+    </>
   );
 };
