@@ -63,6 +63,7 @@ import { fetchMachines, selectMachines } from '../../store/slices/machineSlice';
 
 import {
   generateCostingRequest,
+  selectCostingData,
   selectCostingLoading,
 } from '../../store/slices/costingSlice';
 
@@ -83,27 +84,13 @@ import type {
   // ILayers,
 } from '../../global/interfaces';
 
+import { MachineItem } from '../Machines';
 // --- Types ---
 interface IMachineItem {
   id: number;
   name: string;
   stepOrder: number;
 }
-
-interface ComponentItem {
-  id: string;
-  name: string;
-  subMaterials?: { name: string; tnvc: string }[];
-}
-
-interface LayerItem {
-  id: string;
-  title: string;
-  coverage?: string;
-  tnvc?: string;
-  components?: ComponentItem[];
-}
-
 interface ICategoryOption {
   value: number;
   label: string;
@@ -224,6 +211,8 @@ export const Costing = () => {
   const [noOfUps, setNoOfUps] = useState<number>(3);
   const [openAddMachineSheet, setOpenAddMachineSheet] =
     useState<boolean>(false);
+  const [openAddMaterialSheet, setOpenAddMaterialSheet] =
+    useState<boolean>(false);
   const [orderType, setOrderType] = useState<string>('');
   const [quantityOrder, setQuantityOrder] = useState<number>(2000000);
   const [repeatLength, setRepeatLength] = useState<number>(533.05);
@@ -234,9 +223,10 @@ export const Costing = () => {
   const [vehicle, setVehicle] = useState<string>('L300');
 
   const dispatch = useDispatch<AppDispatch>();
-  const materialCategories = useSelector(selectCategories);
-  const machineOptions = useSelector(selectMachines);
+  const costingData = useSelector(selectCostingData);
   const costingLoading = useSelector(selectCostingLoading);
+  const machineOptions = useSelector(selectMachines);
+  const materialCategories = useSelector(selectCategories);
 
   useEffect(() => {
     dispatch(fetchMachines());
@@ -288,8 +278,6 @@ export const Costing = () => {
         label: m.name,
       }));
   }, [machineOptions, machines]);
-
-  console.log('[[Machines]]', machineType);
 
   const handleMachineDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -375,10 +363,7 @@ export const Costing = () => {
       <Sheet open={openAddMachineSheet} onOpenChange={setOpenAddMachineSheet}>
         <SheetContent>
           <SheetHeader>
-            <SheetTitle>Add New Layer</SheetTitle>
-            <SheetDescription>
-              {/* Type: {layerOptions[selectedLayerIndex].type} */}
-            </SheetDescription>
+            <SheetTitle>Add New Machine To Process Route</SheetTitle>
           </SheetHeader>
           <Container>
             <div className='grid gap-6 mb-4 lg:grid-cols-0'>
@@ -414,6 +399,50 @@ export const Costing = () => {
                 onClick={() => addLayerClickHandler(machineType)}
               >
                 Add To Process Routing
+              </Button>
+            </div>
+          </Container>
+        </SheetContent>
+      </Sheet>
+      <Sheet open={openAddMaterialSheet} onOpenChange={setOpenAddMaterialSheet}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Add New Material To Layers</SheetTitle>
+          </SheetHeader>
+          <Container>
+            <div className='grid gap-6 mb-4 lg:grid-cols-0'>
+              <div>
+                <label
+                  htmlFor='machineType'
+                  className={classNames(
+                    'block mb-2 text-sm font-medium',
+                    errors.machineType ? 'text-red-600' : 'text-gray-900',
+                  )}
+                >
+                  Material Name
+                </label>
+                <Select<ISelect>
+                  id='machineType'
+                  options={selectMachineOptions}
+                  onChange={(type) => {
+                    setSingleSelectState(
+                      setMachineType,
+                      setErrors,
+                      'machineType',
+                      type,
+                    );
+                  }}
+                  styles={customErrorStyle('machineType', errors.layerType)}
+                />
+              </div>
+            </div>
+            <div className='py-4'>
+              <Button
+                type='button'
+                className='py-4'
+                onClick={() => addLayerClickHandler(machineType)}
+              >
+                Add To Layers
               </Button>
             </div>
           </Container>
@@ -758,38 +787,23 @@ export const Costing = () => {
                     items={machines.map((r) => r.id)}
                     strategy={verticalListSortingStrategy}
                   >
-                    {machines.map((machine, index) => (
-                      <SortableItem key={machine.id} id={machine.id}>
-                        {({ dragHandleProps }) => (
-                          /* Custom Machine Row Design */
-                          <div className='flex items-center justify-between p-3 bg-white border border-gray-200 rounded-md mb-2 shadow-sm'>
-                            <div className='flex items-center gap-3'>
-                              {/* Drag Handle Button */}
-                              <button
-                                type='button'
-                                {...dragHandleProps.attributes}
-                                {...dragHandleProps.listeners}
-                                className='cursor-grab text-gray-400 hover:text-gray-600 p-1'
-                              >
-                                <GripVertical className='w-4 h-4' />
-                              </button>
-                              <span className='font-bold text-gray-700'>
-                                {index + 1}
-                              </span>
-                              <span className='font-semibold text-gray-800'>
-                                {machine.name}
-                              </span>
-                            </div>
+                    {machines.map((machine, index) => {
+                      // ✅ Match by index/sequence position instead of machine.name to support duplicate machines safely
+                      const match = costingData?.machines?.[index];
 
-                            {/* <div className='flex items-center gap-2'>
-                          <button onClick={() => editMachine(route.id)}>
-                            <Edit2 className='w-4 h-4 text-gray-400' />
-                          </button>
-                        </div> */}
-                          </div>
-                        )}
-                      </SortableItem>
-                    ))}
+                      return (
+                        <SortableItem key={machine.id} id={machine.id}>
+                          {({ dragHandleProps }) => (
+                            <MachineItem
+                              machine={machine}
+                              index={index}
+                              match={match}
+                              dragHandleProps={dragHandleProps}
+                            />
+                          )}
+                        </SortableItem>
+                      );
+                    })}
                   </SortableContext>
                 </DndContext>
               </div>
@@ -815,7 +829,10 @@ export const Costing = () => {
                     </h2>
                     <p className='text-xs text-gray-400'>(Draggable Stack)</p>
                   </div>
-                  <Button className='flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-3 py-1.5 rounded'>
+                  <Button
+                    onClick={() => setOpenAddMaterialSheet(true)}
+                    className='flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-3 py-1.5 rounded'
+                  >
                     <Plus className='w-3.5 h-3.5' /> Add Layer
                   </Button>
                 </div>
