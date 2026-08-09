@@ -21,9 +21,18 @@ export interface IMachineStep {
   estimatedTimeHours: number;
 }
 
+export interface IDelivery {
+  vehicleName: string;
+  costPerTrip: number;
+  maxCapacity: number;
+  totalTrips: number;
+  totalCost: number;
+}
+
 export interface ICostingData {
-  machines: IMachineStep[]; // Array supporting 1 to N machines
-  // Add other top-level payload properties here if needed (e.g., layers, job specs)
+  machines: IMachineStep[];
+  totalMachineCost: number;
+  delivery: IDelivery;
 }
 
 interface IState {

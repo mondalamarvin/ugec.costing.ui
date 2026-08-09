@@ -65,6 +65,7 @@ import {
   generateCostingRequest,
   selectCostingData,
   selectCostingLoading,
+  resetCosting,
 } from '../../store/slices/costingSlice';
 
 import {
@@ -293,6 +294,7 @@ export const Costing = () => {
         stepOrder: index + 1,
       }));
     });
+    dispatch(resetCosting());
   };
 
   const handleLayerDragEnd = (event: DragEndEvent) => {
@@ -804,6 +806,21 @@ export const Costing = () => {
                         </SortableItem>
                       );
                     })}
+                    <div className='flex items-center'>
+                      <span className='font-semibold'>Total Machine Cost:</span>
+
+                      {/* ml-auto pushes it all the way to the right */}
+                      <span className='ml-auto font-bold text-gray-900'>
+                        {'\u20B1'}
+                        {costingData?.totalMachineCost?.toLocaleString(
+                          'en-US',
+                          {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          },
+                        ) ?? '0.00'}
+                      </span>
+                    </div>
                   </SortableContext>
                 </DndContext>
               </div>
@@ -813,6 +830,35 @@ export const Costing = () => {
                 <h2 className='text-lg font-bold text-gray-800 mb-2'>
                   Packaging Materials & Total Cost
                 </h2>
+                {costingData && (
+                  <>
+                    <div>
+                      <span>Vehicle: {costingData.delivery.vehicleName}</span>
+                    </div>
+                    <div>
+                      <span>
+                        Max Capacity: {costingData.delivery.maxCapacity}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span>
+                        Total Trips: {costingData.delivery.totalTrips}
+                      </span>
+                    </div>
+                    <div>
+                      <span>
+                        Price per Trip: {costingData.delivery.costPerTrip}
+                      </span>
+                    </div>
+                    <div>
+                      <span>
+                        Total Delivery Cost: {costingData.delivery.totalCost}
+                      </span>
+                    </div>
+                  </>
+                )}
+
                 <p className='text-xs text-gray-500'>
                   Final Assembly & Packaging: Boxes (5000 units, [Mat ID 221])
                 </p>
