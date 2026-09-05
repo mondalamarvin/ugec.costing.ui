@@ -21,7 +21,7 @@ const initialState = {
 } as IState;
 
 const machineSlice = createSlice({
-  name: 'material',
+  name: 'machines',
   initialState,
   reducers: {
     resetMachines(state) {

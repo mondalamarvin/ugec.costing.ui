@@ -26,7 +26,7 @@ interface ISubComponents {
 }
 
 export interface ICostingRequest {
-  orderType: string;
+  orderType: number;
   quantityOrder: number;
   spreadWidth: number;
   spreadHeight: number;

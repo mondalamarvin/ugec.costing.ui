@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { GripVertical, ChevronDown, ChevronUp } from 'lucide-react';
+import { GripVertical, ChevronDown, ChevronUp, Trash } from 'lucide-react';
 
 interface MachineItemProps {
   machine: any;
   index: number;
   match: any;
   dragHandleProps: any;
+  onRemove: (id: number) => void;
 }
 
 export const MachineItem = ({
@@ -13,8 +14,10 @@ export const MachineItem = ({
   index,
   match,
   dragHandleProps,
+  onRemove,
 }: MachineItemProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
+
   return (
     <div className='bg-white border border-gray-200 rounded-md mb-2 shadow-sm p-3 transition-all'>
       {/* --- TOP ROW (ALWAYS VISIBLE) --- */}
@@ -32,7 +35,9 @@ export const MachineItem = ({
 
           <span className='font-bold text-gray-700'>{index + 1}</span>
 
-          <span className='font-semibold text-gray-800'>{machine.name}</span>
+          <span className='font-semibold text-gray-800'>
+            {machine.machineName}
+          </span>
 
           {match && (
             <span className='text-xs bg-emerald-100 text-emerald-700 font-medium px-2 py-0.5 rounded-full'>
@@ -41,37 +46,49 @@ export const MachineItem = ({
           )}
         </div>
 
-        {/* Right Side: Metrics + Expansion Toggle */}
-        {match ? (
-          <div className='flex items-center gap-3 text-sm'>
-            <div className='text-right'>
-              <span className='text-xs text-gray-400 block uppercase font-medium'>
-                Overhead
-              </span>
-              <span className='font-bold text-gray-800'>
-                {'\u20B1'}
-                {match.machineOverheadCost?.toLocaleString() ?? 0}
-              </span>
-            </div>
-            {/* Chevron Toggle Button */}
-            <button
-              type='button'
-              onClick={() => setIsExpanded(!isExpanded)}
-              className='p-1.5 ml-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors'
-              title={isExpanded ? 'Collapse details' : 'Expand details'}
-            >
-              {isExpanded ? (
-                <ChevronUp className='w-4 h-4' />
-              ) : (
-                <ChevronDown className='w-4 h-4' />
-              )}
-            </button>
-          </div>
-        ) : (
-          <span className='text-xs text-gray-400 italic'>
-            Pending calculation
-          </span>
-        )}
+        <div className='flex items-center gap-3 text-sm'>
+          {match ? (
+            <>
+              <div className='text-right mr-1'>
+                <span className='text-xs text-gray-400 block uppercase font-medium'>
+                  Overhead
+                </span>
+                <span className='font-bold text-gray-800'>
+                  {'\u20B1'}
+                  {match.machineOverheadCost?.toLocaleString() ?? 0}
+                </span>
+              </div>
+
+              {/* Chevron Toggle Button */}
+              <button
+                type='button'
+                onClick={() => setIsExpanded(!isExpanded)}
+                className='p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors'
+                title={isExpanded ? 'Collapse details' : 'Expand details'}
+              >
+                {isExpanded ? (
+                  <ChevronUp className='w-4 h-4' />
+                ) : (
+                  <ChevronDown className='w-4 h-4' />
+                )}
+              </button>
+            </>
+          ) : (
+            <span className='text-xs italic text-gray-400 mr-1'>
+              Pending calculation
+            </span>
+          )}
+
+          {/* Consistent Far-Right Delete Button */}
+          <button
+            type='button'
+            onClick={() => onRemove(machine.id)}
+            className='p-1.5 text-gray-400 hover:text-red-700 hover:bg-red-100 rounded transition-colors'
+            title='Remove Process Route'
+          >
+            <Trash className='w-4 h-4 text-red-500' />
+          </button>
+        </div>
       </div>
 
       {/* --- EXPANDABLE BOTTOM DETAILS SECTION --- */}
@@ -80,23 +97,17 @@ export const MachineItem = ({
           <p className='font-semibold text-gray-600 mb-2'>
             Calculation Breakdown
           </p>
-          <div className='grid grid-cols-2 md:grid-cols-4 gap-3'>
+          <div className='grid grid-cols-2 md:grid-cols-3 gap-3'>
             <div>
               <span className='text-gray-400 block'>Meters to Run</span>
               <span className='font-semibold text-gray-700'>
-                {match.totalMachineRun ?? 0}
+                {match.totalMachineRun?.toLocaleString() ?? 0}
               </span>
             </div>
             <div>
               <span className='text-gray-400 block'>Speed</span>
               <span className='font-semibold text-gray-700'>
-                ${match.hourlyRate?.toLocaleString() ?? 0}/hr
-              </span>
-            </div>
-            <div>
-              <span className='text-gray-400 block'>Set Up</span>
-              <span className='font-semibold text-gray-700'>
-                ${match.wasteCost?.toLocaleString() ?? 0}
+                {match.speed?.toLocaleString() ?? 0} meters/mins
               </span>
             </div>
             <div>

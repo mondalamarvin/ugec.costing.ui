@@ -15,47 +15,27 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import {
-  GripVertical,
-  Edit2,
-  Trash2,
-  ChevronDown,
-  ChevronRight,
-  Plus,
-} from 'lucide-react';
+import { GripVertical, ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import Select from 'react-select';
 import classNames from 'classnames';
 import {
   Button,
-  Card,
-  CardHeader,
-  CardContent,
   Container,
   Field,
   FieldLabel,
-  Form,
   Input,
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
-  SheetDescription,
-  Spinner,
-  CardTitle,
-  Progress,
-  Badge,
-  CardAction,
   SortableItem,
+  Spinner,
 } from '../ui';
 
 import type { AppDispatch } from '../../store/store';
 
 import {
   fetchMaterialCategories,
-  fetchMaterialsByCategory,
-  resetMaterials,
-  selectMaterialLoading,
-  selectMaterials,
   selectCategories,
 } from '../../store/slices/materialSlice';
 
@@ -69,8 +49,13 @@ import {
 } from '../../store/slices/costingSlice';
 
 import {
+  fetchprocessRoutes,
+  selectprocessRoutes,
+  selectProcessRoutesLoading,
+} from '../../store/slices/processRouteSlice';
+
+import {
   setSingleSelectState,
-  setMultiSelectState,
   customErrorStyle,
   setInputState,
 } from '../../lib';
@@ -80,9 +65,6 @@ import type {
   IInputErrors,
   ILayers,
   ISelect,
-  // IFormula,
-  // IMaterial,
-  // ILayers,
 } from '../../global/interfaces';
 
 import { MachineItem } from '../Machines';
@@ -91,14 +73,13 @@ interface IMachineItem {
   id: number;
   name: string;
   stepOrder: number;
+  onRemove?: () => void;
 }
 interface ICategoryOption {
   value: number;
   label: string;
   category: string;
 }
-
-const defaultMachines = [{ machineId: 1 }, { machineId: 2 }];
 
 const layerOprions = [
   {
@@ -187,7 +168,10 @@ const layerOprions = [
   },
 ];
 
-const orderTypeOptions = [{ value: 'Conesleeves', label: 'Conesleeves' }];
+const orderTypeOptions = [
+  { value: 1, label: 'Conesleeves' },
+  { value: 2, label: 'Box' },
+];
 
 export const mapToProcessRoute = (items: IMachineItem[]) => {
   return items.map((item, index) => ({
@@ -214,7 +198,7 @@ export const Costing = () => {
     useState<boolean>(false);
   const [openAddMaterialSheet, setOpenAddMaterialSheet] =
     useState<boolean>(false);
-  const [orderType, setOrderType] = useState<string>('');
+  const [orderType, setOrderType] = useState<number>(0);
   const [quantityOrder, setQuantityOrder] = useState<number>(2000000);
   const [repeatLength, setRepeatLength] = useState<number>(533.05);
   const [pcsPerBox, setPcsPerBox] = useState<number>(5000);
@@ -228,6 +212,8 @@ export const Costing = () => {
   const costingLoading = useSelector(selectCostingLoading);
   const machineOptions = useSelector(selectMachines);
   const materialCategories = useSelector(selectCategories);
+  const processRoutes = useSelector(selectprocessRoutes);
+  const processRoutesLoading = useSelector(selectProcessRoutesLoading);
 
   useEffect(() => {
     dispatch(fetchMachines());
@@ -238,22 +224,16 @@ export const Costing = () => {
   }, [dispatch]);
 
   useEffect(() => {
-    if (machineOptions && machineOptions.length > 0) {
-      const initializedMachines = defaultMachines.map((item, idx) => {
-        const matched = (machineOptions as IMachineItem[]).find(
-          (o) => o.id === item.machineId,
-        );
-
-        return {
-          id: item.machineId,
-          name: matched?.name ?? `Machine #${item.machineId}`,
-          stepOrder: idx + 1,
-        };
-      });
-
-      setMachines(initializedMachines);
+    if (orderType !== 0) {
+      dispatch(fetchprocessRoutes(orderType));
     }
-  }, [machineOptions]);
+  }, [orderType, dispatch]);
+
+  useEffect(() => {
+    if (processRoutes) {
+      setMachines(processRoutes);
+    }
+  }, [processRoutes]);
 
   useEffect(() => {
     if (materialCategories) {
@@ -311,6 +291,12 @@ export const Costing = () => {
         layerOrder: index,
       }));
     });
+  };
+
+  const removeItemClickHandler = (id: number) => {
+    setMachines((prevMachines) =>
+      prevMachines.filter((item) => item.id !== id),
+    );
   };
 
   const addLayerClickHandler = useCallback(
@@ -801,25 +787,43 @@ export const Costing = () => {
                               index={index}
                               match={match}
                               dragHandleProps={dragHandleProps}
+                              onRemove={() =>
+                                removeItemClickHandler(machine.id)
+                              }
                             />
                           )}
                         </SortableItem>
                       );
                     })}
-                    <div className='flex items-center'>
-                      <span className='font-semibold'>Total Machine Cost:</span>
-
-                      {/* ml-auto pushes it all the way to the right */}
-                      <span className='ml-auto font-bold text-gray-900'>
-                        {'\u20B1'}
-                        {costingData?.totalMachineCost?.toLocaleString(
-                          'en-US',
-                          {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          },
-                        ) ?? '0.00'}
-                      </span>
+                    <div
+                      className={`flex items-center ${processRoutesLoading ? 'justify-center' : 'justify-between'}`}
+                    >
+                      {processRoutesLoading ? (
+                        <div className='flex items-center gap-2'>
+                          <Spinner />
+                          <span>Loading Please wait</span>
+                        </div>
+                      ) : (
+                        <>
+                          {machines.length > 0 && (
+                            <>
+                              <span className='font-semibold'>
+                                Total Machine Cost:
+                              </span>
+                              <span className='ml-auto font-bold text-gray-900'>
+                                {'\u20B1'}
+                                {costingData?.totalMachineCost?.toLocaleString(
+                                  'en-US',
+                                  {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  },
+                                ) ?? '0.00'}
+                              </span>
+                            </>
+                          )}
+                        </>
+                      )}
                     </div>
                   </SortableContext>
                 </DndContext>
@@ -1044,7 +1048,15 @@ export const Costing = () => {
                       : 'Generate Costing Request'}
                   </span>
                   <span className='text-[10px] text-gray-400'>
-                    Estimated Cost: $9,300.20
+                    Estimated Cost: {'\u20B1'}
+                    {costingData
+                      ? (
+                          costingData.totalMachineCost +
+                          costingData.totalMaterialCost +
+                          costingData.totalMachineCost +
+                          costingData.totalDeliveryCost
+                        ).toLocaleString()
+                      : 0}
                   </span>
                 </Button>
               </div>

@@ -32,6 +32,9 @@ export interface IDelivery {
 export interface ICostingData {
   machines: IMachineStep[];
   totalMachineCost: number;
+  totalMaterialCost: number;
+  totalDeliveryCost: number;
+  totalCylinderCost: number;
   delivery: IDelivery;
 }
 
