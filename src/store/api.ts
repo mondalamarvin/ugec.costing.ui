@@ -44,3 +44,10 @@ export const getMachines = async () => {
   });
   return data;
 };
+
+export const getProcessRoutes = async (orderTypeId: number) => {
+  const data = await axios.get(`/ProcessTypes/${orderTypeId}`).then((res) => {
+    return res?.data;
+  });
+  return data;
+};
