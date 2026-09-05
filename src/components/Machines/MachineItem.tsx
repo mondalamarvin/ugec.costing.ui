@@ -97,7 +97,7 @@ export const MachineItem = ({
           <p className='font-semibold text-gray-600 mb-2'>
             Calculation Breakdown
           </p>
-          <div className='grid grid-cols-2 md:grid-cols-3 gap-3'>
+          <div className='grid grid-cols-2 md:grid-cols-4 gap-3'>
             <div>
               <span className='text-gray-400 block'>Meters to Run</span>
               <span className='font-semibold text-gray-700'>
@@ -108,6 +108,13 @@ export const MachineItem = ({
               <span className='text-gray-400 block'>Speed</span>
               <span className='font-semibold text-gray-700'>
                 {match.speed?.toLocaleString() ?? 0} meters/mins
+              </span>
+            </div>
+            <div>
+              <span className='text-gray-400 block'>Rate Per Hour</span>
+              <span className='font-semibold text-gray-700'>
+                {'\u20B1'}
+                {machine?.ratePerHour.toLocaleString() ?? 0}
               </span>
             </div>
             <div>
