@@ -38,6 +38,7 @@ export interface ICostingRequest {
   pcsPerBox: number;
   noOfColor: number;
   vehicle: string;
+  packagingMaterials: any;
   processRoute: IProcessRoute[];
   layers: ILayers[];
 }
