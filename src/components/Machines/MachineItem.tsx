@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { GripVertical, ChevronDown, ChevronUp, Trash } from 'lucide-react';
-
+import { formatNumber } from '../../lib';
 interface MachineItemProps {
   machine: any;
   index: number;
@@ -19,7 +19,7 @@ export const MachineItem = ({
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <div className='bg-white border border-gray-200 rounded-md mb-2 shadow-sm p-3 transition-all'>
+    <div className='bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-md mb-2 shadow-sm p-3 transition-all'>
       {/* --- TOP ROW (ALWAYS VISIBLE) --- */}
       <div className='flex items-center justify-between'>
         {/* Left Side: Drag Handle, Index, Machine Name */}
@@ -50,12 +50,12 @@ export const MachineItem = ({
           {match ? (
             <>
               <div className='text-right mr-1'>
-                <span className='text-xs text-gray-400 block uppercase font-medium'>
+                <span className='text-xs  text-gray-400 block uppercase font-medium'>
                   Overhead
                 </span>
                 <span className='font-bold text-gray-800'>
                   {'\u20B1'}
-                  {match.machineOverheadCost?.toLocaleString() ?? 0}
+                  {formatNumber(match.machineOverheadCost, 2) ?? 0}
                 </span>
               </div>
 
