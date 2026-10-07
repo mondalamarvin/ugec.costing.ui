@@ -58,6 +58,7 @@ import {
   setSingleSelectState,
   customErrorStyle,
   setInputState,
+  formatNumber,
 } from '../../lib';
 
 import type {
@@ -68,6 +69,7 @@ import type {
 } from '../../global/interfaces';
 
 import { MachineItem } from '../Machines';
+import { PackagingItem } from '../Packaging';
 // --- Types ---
 interface IMachineItem {
   id: number;
@@ -173,6 +175,30 @@ const orderTypeOptions = [
   { value: 2, label: 'Box' },
 ];
 
+const packagingMaterials = [
+  {
+    materialId: 22,
+    quantity: 10000,
+  },
+  {
+    materialId: 23,
+    quantity: 5000,
+    components: [
+      {
+        materialId: 24,
+        quantity: 5,
+      },
+      {
+        materialId: 25,
+        quantity: 5,
+      },
+      {
+        materialId: 26,
+        quantity: 1,
+      },
+    ],
+  },
+];
 export const mapToProcessRoute = (items: IMachineItem[]) => {
   return items.map((item, index) => ({
     machineId: Number(item.id),
@@ -187,7 +213,6 @@ export const Costing = () => {
   const [expandedLayer, setExpandedLayer] = useState<number | null>(4);
   const [expandedComp, setExpandedComp] = useState<number | null>(3);
   const [layers, setLayers] = useState<ILayers[]>(layerOprions);
-  const [layerType, setLayerType] = useState<number>(0);
   const [machines, setMachines] = useState<IMachineItem[]>([]);
   const [machineType, setMachineType] = useState<number>(0);
   const [netRollWidth, setNetRollWidth] = useState<number>(559.71);
@@ -206,6 +231,7 @@ export const Costing = () => {
   const [spreadWidth, setSpreadWidth] = useState<number>(180.38);
   const [totalImages, setTotalImages] = useState<number>(12);
   const [vehicle, setVehicle] = useState<string>('L300');
+  const [isPackExpanded, setPackIsExpanded] = useState<boolean>(false);
 
   const dispatch = useDispatch<AppDispatch>();
   const costingData = useSelector(selectCostingData);
@@ -340,9 +366,9 @@ export const Costing = () => {
       noOfColor: noOfColors,
       processRoute: mapToProcessRoute(machines),
       layers: layers,
+      packagingMaterials: packagingMaterials,
       vehicle: 'L300',
     };
-    // console.log('[[Data]]', data);
     dispatch(generateCostingRequest(data));
   };
 
@@ -751,6 +777,7 @@ export const Costing = () => {
 
               {/* Section 2: Process Routing (Step Sequencer) */}
               <div className='bg-white p-5 rounded-lg border border-gray-200 shadow-sm'>
+                {/* Card Header */}
                 <div className='flex items-center justify-between mb-4'>
                   <div>
                     <h2 className='text-md font-bold text-gray-800'>
@@ -766,6 +793,8 @@ export const Costing = () => {
                     <Plus className='w-3.5 h-3.5' /> Add Machine
                   </Button>
                 </div>
+
+                {/* Drag-and-Drop Container */}
                 <DndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
@@ -775,54 +804,54 @@ export const Costing = () => {
                     items={machines.map((r) => r.id)}
                     strategy={verticalListSortingStrategy}
                   >
-                    {machines.map((machine, index) => {
-                      // ✅ Match by index/sequence position instead of machine.name to support duplicate machines safely
-                      const match = costingData?.machines?.[index];
+                    <div className='space-y-3'>
+                      {machines.map((machine, index) => {
+                        const match = costingData?.machines?.[index];
 
-                      return (
-                        <SortableItem key={machine.id} id={machine.id}>
-                          {({ dragHandleProps }) => (
-                            <MachineItem
-                              machine={machine}
-                              index={index}
-                              match={match}
-                              dragHandleProps={dragHandleProps}
-                              onRemove={() =>
-                                removeItemClickHandler(machine.id)
-                              }
-                            />
-                          )}
-                        </SortableItem>
-                      );
-                    })}
+                        return (
+                          <SortableItem key={machine.id} id={machine.id}>
+                            {({ dragHandleProps }) => (
+                              <MachineItem
+                                machine={machine}
+                                index={index}
+                                match={match}
+                                dragHandleProps={dragHandleProps}
+                                onRemove={() =>
+                                  removeItemClickHandler(machine.id)
+                                }
+                              />
+                            )}
+                          </SortableItem>
+                        );
+                      })}
+                    </div>
+
+                    {/* Summary / Loading Footer Section */}
                     <div
-                      className={`flex items-center ${processRoutesLoading ? 'justify-center' : 'justify-between'}`}
+                      className={`mt-4 pt-3 border-t border-gray-100 flex items-center ${
+                        processRoutesLoading ? 'justify-center' : 'justify-end'
+                      }`}
                     >
                       {processRoutesLoading ? (
-                        <div className='flex items-center gap-2'>
+                        <div className='flex items-center gap-2 text-sm text-gray-500 py-2'>
                           <Spinner />
-                          <span>Loading Please wait</span>
+                          <span>Loading, please wait...</span>
                         </div>
                       ) : (
-                        <>
-                          {machines.length > 0 && (
-                            <>
-                              <span className='font-semibold'>
-                                Total Machine Cost:
-                              </span>
-                              <span className='ml-auto font-bold text-gray-900'>
-                                {'\u20B1'}
-                                {costingData?.totalMachineCost?.toLocaleString(
-                                  'en-US',
-                                  {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  },
-                                ) ?? '0.00'}
-                              </span>
-                            </>
-                          )}
-                        </>
+                        machines.length > 0 && (
+                          /* Match the right-padding of MachineItem (e.g., pr-12 or pr-16) to align total directly under individual row costs */
+                          <div className='flex items-center gap-3 pr-12'>
+                            <span className='font-semibold text-gray-700 text-sm'>
+                              Total Machine Cost:
+                            </span>
+                            <span className='font-bold text-gray-900 text-base tabular-nums'>
+                              {'\u20B1'}
+                              {costingData
+                                ? formatNumber(costingData?.totalMachineCost, 2)
+                                : '0.00'}
+                            </span>
+                          </div>
+                        )
                       )}
                     </div>
                   </SortableContext>
@@ -836,36 +865,68 @@ export const Costing = () => {
                 </h2>
                 {costingData && (
                   <>
-                    <div>
-                      <span>Vehicle: {costingData.delivery.vehicleName}</span>
+                    <div className='bg-white border border-gray-200 rounded-md mb-2 shadow-sm p-3 transition-all'>
+                      <h3 className='text-lg font-bold text-gray-700'>
+                        Delivery Rate
+                      </h3>
+                      <div>
+                        <span>Vehicle: {costingData.delivery.vehicleName}</span>
+                      </div>
+                      <div>
+                        <span>
+                          Max Capacity:{' '}
+                          {costingData.delivery.maxCapacity.toLocaleString()}
+                        </span>
+                      </div>
+                      <div>
+                        <span>
+                          Total Trips: {costingData.delivery.totalTrips}
+                        </span>
+                      </div>
+                      <div>
+                        <span>
+                          Price per Trip:{' '}
+                          {costingData.delivery.costPerTrip.toLocaleString()}
+                        </span>
+                      </div>
+                      <div>
+                        <span>
+                          Total Delivery Cost:{' '}
+                          {costingData.delivery.totalCost.toLocaleString()}
+                        </span>
+                      </div>
+                      <p className='text-xs text-gray-500'>
+                        Final Assembly & Packaging: (
+                        {(
+                          quantityOrder /
+                          pcsPerBox /
+                          costingData.delivery.totalTrips
+                        ).toLocaleString()}{' '}
+                        boxes per trip)
+                      </p>
                     </div>
-                    <div>
-                      <span>
-                        Max Capacity: {costingData.delivery.maxCapacity}
-                      </span>
-                    </div>
-
-                    <div>
-                      <span>
-                        Total Trips: {costingData.delivery.totalTrips}
-                      </span>
-                    </div>
-                    <div>
-                      <span>
-                        Price per Trip: {costingData.delivery.costPerTrip}
-                      </span>
-                    </div>
-                    <div>
-                      <span>
-                        Total Delivery Cost: {costingData.delivery.totalCost}
-                      </span>
+                    <div className='bg-white border border-gray-200 rounded-md mb-2 shadow-sm p-3 transition-all'>
+                      <h3 className='text-lg font-bold text-gray-700'>
+                        Packaging Materials
+                      </h3>
+                      {costingData.packaging.map((p: any, index: number) => {
+                        return (
+                          <PackagingItem
+                            key={p.name}
+                            item={p}
+                            index={index}
+                            isPackExpanded={isPackExpanded}
+                            onToggle={() =>
+                              setPackIsExpanded(
+                                isPackExpanded === p.name ? null : p.name,
+                              )
+                            }
+                          />
+                        );
+                      })}
                     </div>
                   </>
                 )}
-
-                <p className='text-xs text-gray-500'>
-                  Final Assembly & Packaging: Boxes (5000 units, [Mat ID 221])
-                </p>
               </div>
             </div>
 
