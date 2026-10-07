@@ -30,6 +30,7 @@ export interface IDelivery {
 }
 
 export interface ICostingData {
+  packaging: any;
   machines: IMachineStep[];
   totalMachineCost: number;
   totalMaterialCost: number;
