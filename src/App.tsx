@@ -1,9 +1,12 @@
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { Costing, CostingOld } from './components/Costing';
 function App() {
   return (
     <>
       <section id='center'>
-        <Costing />
+        <TooltipProvider>
+          <Costing />
+        </TooltipProvider>
       </section>
     </>
   );
