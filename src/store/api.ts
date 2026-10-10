@@ -51,3 +51,10 @@ export const getProcessRoutes = async (orderTypeId: number) => {
   });
   return data;
 };
+
+export const getProcessPackaging = async (orderTypeId: number) => {
+  const data = await axios.get(`/packaging/${orderTypeId}`).then((res) => {
+    return res?.data;
+  });
+  return data;
+};

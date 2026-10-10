@@ -1,16 +1,29 @@
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Trash, Plus } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { formatNumber } from '@/lib';
 
 export const PackagingItem = ({
   item,
   index,
+  isComputed,
   isPackExpanded,
   onToggle,
+  onDelete,
+  onDeleteComponent,
+  onAddComponent,
 }: {
   item: any;
   index: number;
+  isComputed: boolean;
   isPackExpanded: boolean;
   onToggle: () => void;
+  onDelete: () => void;
+  onDeleteComponent: (componentIndex: number) => void;
+  onAddComponent: () => void;
 }) => {
   const componentsTotal = item.components.reduce(
     (sum: number, component: any) => sum + (component.totalCost || 0),
@@ -29,34 +42,102 @@ export const PackagingItem = ({
           {item.name}
         </div>
 
-        <div className='flex items-center gap-2'>
-          <div className='text-right text-sm'>
-            <span className='text-xs text-gray-400 block uppercase font-medium'>
-              Total Cost
-            </span>
+        <div className='flex items-center gap-3 text-sm'>
+          {isComputed ? (
+            <>
+              <span className='text-xs bg-emerald-100 text-emerald-700 font-medium px-2 py-0.5 rounded-full'>
+                Calculated
+              </span>
+              <div className='text-right'>
+                <span className='text-xs text-gray-400 block uppercase font-medium'>
+                  Total Cost
+                </span>
+                <span className='font-bold text-gray-800'>
+                  {'\u20B1'}
+                  {formatNumber(item.totalCost, 2) ?? 0}
+                </span>
+              </div>
 
-            <span className='font-bold text-gray-800'>
-              {'\u20B1'}
-              {formatNumber(item.totalCost, 2) ?? 0}
-            </span>
-          </div>
-
-          {item.components.length > 0 && (
-            <div className='w-7 flex justify-center'>
-              <button
-                type='button'
-                onClick={onToggle}
-                className='p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors'
-                title={isPackExpanded ? 'Collapse details' : 'Expand details'}
-              >
-                {isPackExpanded ? (
-                  <ChevronUp className='w-4 h-4' />
-                ) : (
-                  <ChevronDown className='w-4 h-4' />
+              <div className='w-7 flex justify-center'>
+                {item.components.length > 0 && (
+                  <button
+                    type='button'
+                    onClick={onToggle}
+                    className='p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors'
+                    title={
+                      isPackExpanded ? 'Collapse details' : 'Expand details'
+                    }
+                  >
+                    {isPackExpanded ? (
+                      <ChevronUp className='w-4 h-4' />
+                    ) : (
+                      <ChevronDown className='w-4 h-4' />
+                    )}
+                  </button>
                 )}
-              </button>
-            </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <span className='text-xs italic text-gray-400'>
+                Pending Calculation
+              </span>
+              <div className='w-7 flex justify-center'>
+                {item.components.length > 0 && (
+                  <button
+                    type='button'
+                    onClick={onToggle}
+                    className='p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors'
+                    title={
+                      isPackExpanded ? 'Collapse details' : 'Expand details'
+                    }
+                  >
+                    {isPackExpanded ? (
+                      <ChevronUp className='w-4 h-4' />
+                    ) : (
+                      <ChevronDown className='w-4 h-4' />
+                    )}
+                  </button>
+                )}
+              </div>
+            </>
           )}
+          <div className='w-7 shrink-0 flex justify-center'>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type='button'
+                  onClick={() => onAddComponent()}
+                  className='p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors'
+                  title='Add Component'
+                >
+                  <Plus className='w-4 h-4 text-green-500' />
+                </button>
+              </TooltipTrigger>
+
+              <TooltipContent>
+                <p>Add Component</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+          <div className='w-7 flex justify-center'>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type='button'
+                  onClick={onDelete}
+                  className='p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors'
+                  title='Delete item'
+                >
+                  <Trash className='w-4 h-4 text-red-500' />
+                </button>
+              </TooltipTrigger>
+
+              <TooltipContent>
+                <p>Delete Item</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
         </div>
       </div>
 
@@ -72,13 +153,41 @@ export const PackagingItem = ({
               className='flex items-center text-sm p-1.5'
             >
               <span className='flex-1 text-gray-700'>{component.name}</span>
-
+              {isComputed ? (
+                <span className='text-xs bg-emerald-100 text-emerald-700 font-medium px-2 py-0.5 rounded-full'>
+                  Calculated
+                </span>
+              ) : (
+                <span className='text-xs italic text-gray-400'>
+                  Pending Calculation
+                </span>
+              )}
               <span className='w-25 text-right font-semibold text-gray-700'>
                 {'\u20B1'}
                 {formatNumber(component.totalCost, 2)}
               </span>
 
-              <div className='w-7' />
+              {/* Reserve space for chevron and trash */}
+              <div className='w-7 shrink-0' />
+              <div className='w-7 shrink-0 flex justify-center'>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type='button'
+                      onClick={() => onDeleteComponent(componentIndex)}
+                      className='p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors'
+                      title='Delete item'
+                    >
+                      <Trash className='w-4 h-4 text-red-500' />
+                    </button>
+                  </TooltipTrigger>
+
+                  <TooltipContent>
+                    <p>Delete Item</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <div className='w-7 shrink-0' />
             </div>
           ))}
 
@@ -91,8 +200,6 @@ export const PackagingItem = ({
               {'\u20B1'}
               {formatNumber(componentsTotal, 2)}
             </span>
-
-            <div className='w-7' />
           </div>
         </div>
       )}

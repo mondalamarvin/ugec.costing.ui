@@ -36,7 +36,9 @@ import type { AppDispatch } from '../../store/store';
 
 import {
   fetchMaterialCategories,
+  fetchMaterialsByCategory,
   selectCategories,
+  selectMaterials,
 } from '../../store/slices/materialSlice';
 
 import { fetchMachines, selectMachines } from '../../store/slices/machineSlice';
@@ -47,6 +49,12 @@ import {
   selectCostingLoading,
   resetCosting,
 } from '../../store/slices/costingSlice';
+
+import {
+  fetchPackagings,
+  selectPackagings,
+  selectPackagingsLoading,
+} from '@/store/slices/packagingSlice';
 
 import {
   fetchprocessRoutes,
@@ -65,6 +73,8 @@ import type {
   ICostingRequest,
   IInputErrors,
   ILayers,
+  IMaterial,
+  IPackaging,
   ISelect,
 } from '../../global/interfaces';
 
@@ -199,6 +209,7 @@ const packagingMaterials = [
     ],
   },
 ];
+
 export const mapToProcessRoute = (items: IMachineItem[]) => {
   return items.map((item, index) => ({
     machineId: Number(item.id),
@@ -208,7 +219,6 @@ export const mapToProcessRoute = (items: IMachineItem[]) => {
 
 // --- Main Advanced Calculator Component ---
 export const Costing = () => {
-  const [categoryOptions, setCategoryOptions] = useState<ICategoryOption[]>([]);
   const [errors, setErrors] = useState<IInputErrors>({});
   const [expandedLayer, setExpandedLayer] = useState<number | null>(4);
   const [expandedComp, setExpandedComp] = useState<number | null>(3);
@@ -223,6 +233,8 @@ export const Costing = () => {
     useState<boolean>(false);
   const [openAddMaterialSheet, setOpenAddMaterialSheet] =
     useState<boolean>(false);
+  const [openAddPackagingComponent, setOpenAddPackagingComponent] =
+    useState<boolean>(false);
   const [orderType, setOrderType] = useState<number>(0);
   const [quantityOrder, setQuantityOrder] = useState<number>(2000000);
   const [repeatLength, setRepeatLength] = useState<number>(533.05);
@@ -232,12 +244,15 @@ export const Costing = () => {
   const [totalImages, setTotalImages] = useState<number>(12);
   const [vehicle, setVehicle] = useState<string>('L300');
   const [isPackExpanded, setPackIsExpanded] = useState<boolean>(false);
+  const [packagings, setPackagings] = useState<any[]>([]);
 
   const dispatch = useDispatch<AppDispatch>();
   const costingData = useSelector(selectCostingData);
   const costingLoading = useSelector(selectCostingLoading);
   const machineOptions = useSelector(selectMachines);
   const materialCategories = useSelector(selectCategories);
+  const materials = useSelector(selectMaterials);
+  const packagingData = useSelector(selectPackagings);
   const processRoutes = useSelector(selectprocessRoutes);
   const processRoutesLoading = useSelector(selectProcessRoutesLoading);
 
@@ -252,6 +267,7 @@ export const Costing = () => {
   useEffect(() => {
     if (orderType !== 0) {
       dispatch(fetchprocessRoutes(orderType));
+      dispatch(fetchPackagings(orderType));
     }
   }, [orderType, dispatch]);
 
@@ -262,10 +278,14 @@ export const Costing = () => {
   }, [processRoutes]);
 
   useEffect(() => {
-    if (materialCategories) {
-      setCategoryOptions(materialCategories);
+    if (packagingData) {
+      setPackagings(packagingData);
     }
-  }, [materialCategories]);
+  }, [packagingData]);
+
+  useEffect(() => {
+    dispatch(fetchMaterialsByCategory(8));
+  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -285,6 +305,31 @@ export const Costing = () => {
         label: m.name,
       }));
   }, [machineOptions, machines]);
+
+  const selectPackagingOptions = useMemo(() => {
+    if (!materials || !packagings) return [];
+
+    const selectedIds = new Set(materials.map((m: IMaterial) => m.value));
+
+    return packagings
+      .filter((p: IPackaging) => !selectedIds.has(p.id))
+      .flatMap((p: IPackaging) => {
+        const packagingOption = {
+          value: p.id,
+          label: p.name,
+        };
+
+        const componentOptions =
+          p.components?.length > 0
+            ? p.components.map((component) => ({
+                value: component.id,
+                label: component.name,
+              }))
+            : [];
+
+        return [packagingOption, ...componentOptions];
+      });
+  }, [materials, packagings]);
 
   const handleMachineDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -319,11 +364,28 @@ export const Costing = () => {
     });
   };
 
-  const removeItemClickHandler = (id: number) => {
-    setMachines((prevMachines) =>
-      prevMachines.filter((item) => item.id !== id),
+  const removeItemClickHandler = (id: number) =>
+    setMachines((prev) => prev.filter((item) => item.id !== id));
+
+  const removePackagingItemHandler = (index: number) =>
+    setPackagings((prev) => prev.filter((_, idx) => idx !== index));
+
+  const removePackagingComponentHandler = (
+    itemIndex: number,
+    componentIndex: number,
+  ) =>
+    setPackagings((prev) =>
+      prev.map((item, idx) =>
+        idx === itemIndex
+          ? {
+              ...item,
+              components: item.components.filter(
+                (_: any, cidx: any) => cidx !== componentIndex,
+              ),
+            }
+          : item,
+      ),
     );
-  };
 
   const addLayerClickHandler = useCallback(
     (id: number) => {
@@ -457,6 +519,100 @@ export const Costing = () => {
                 onClick={() => addLayerClickHandler(machineType)}
               >
                 Add To Layers
+              </Button>
+            </div>
+          </Container>
+        </SheetContent>
+      </Sheet>
+      <Sheet
+        open={openAddPackagingComponent}
+        onOpenChange={setOpenAddPackagingComponent}
+      >
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Add Packaging Item</SheetTitle>
+          </SheetHeader>
+          <Container>
+            <div className='grid gap-6 mb-4 lg:grid-cols-0'>
+              <div>
+                <label
+                  htmlFor='materialName'
+                  className={classNames(
+                    'block mb-2 text-sm font-medium',
+                    errors.materialName ? 'text-red-600' : 'text-gray-900',
+                  )}
+                >
+                  Material Name
+                </label>
+                <Select<ISelect>
+                  id='materialName'
+                  options={selectPackagingOptions}
+                  onChange={(type) => {
+                    setSingleSelectState(
+                      setMachineType,
+                      setErrors,
+                      'materialName',
+                      type,
+                    );
+                  }}
+                  styles={customErrorStyle('materialName', errors.layerType)}
+                />
+              </div>
+            </div>
+            <div className='py-4'>
+              <Button
+                type='button'
+                className='py-4'
+                onClick={() => addLayerClickHandler(machineType)}
+              >
+                Add New Component
+              </Button>
+            </div>
+          </Container>
+        </SheetContent>
+      </Sheet>
+      <Sheet
+        open={openAddPackagingComponent}
+        onOpenChange={setOpenAddPackagingComponent}
+      >
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Add Component to Packaging</SheetTitle>
+          </SheetHeader>
+          <Container>
+            <div className='grid gap-6 mb-4 lg:grid-cols-0'>
+              <div>
+                <label
+                  htmlFor='materialName'
+                  className={classNames(
+                    'block mb-2 text-sm font-medium',
+                    errors.materialName ? 'text-red-600' : 'text-gray-900',
+                  )}
+                >
+                  Material Name
+                </label>
+                <Select<ISelect>
+                  id='materialName'
+                  options={selectPackagingOptions}
+                  onChange={(type) => {
+                    setSingleSelectState(
+                      setMachineType,
+                      setErrors,
+                      'materialName',
+                      type,
+                    );
+                  }}
+                  styles={customErrorStyle('materialName', errors.layerType)}
+                />
+              </div>
+            </div>
+            <div className='py-4'>
+              <Button
+                type='button'
+                className='py-4'
+                onClick={() => addLayerClickHandler(machineType)}
+              >
+                Add New Component
               </Button>
             </div>
           </Container>
@@ -860,9 +1016,22 @@ export const Costing = () => {
 
               {/* Section 3: Packaging Materials */}
               <div className='bg-white p-5 rounded-lg border border-gray-200 shadow-sm'>
-                <h2 className='text-lg font-bold text-gray-800 mb-2'>
-                  Packaging Materials & Total Cost
-                </h2>
+                <div className='flex items-center justify-between mb-4'>
+                  <div>
+                    <h2 className='text-md font-bold text-gray-800'>
+                      Packaging Materials & Total Cost
+                    </h2>
+                  </div>
+                  <Button
+                    type='button'
+                    onClick={() =>
+                      setOpenAddPackagingComponent(!openAddPackagingComponent)
+                    }
+                    className='flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-3 py-1.5 rounded'
+                  >
+                    <Plus className='w-3.5 h-3.5' /> Add Packaging Material
+                  </Button>
+                </div>
                 {costingData && (
                   <>
                     <div className='bg-white border border-gray-200 rounded-md mb-2 shadow-sm p-3 transition-all'>
@@ -906,27 +1075,82 @@ export const Costing = () => {
                       </p>
                     </div>
                     <div className='bg-white border border-gray-200 rounded-md mb-2 shadow-sm p-3 transition-all'>
-                      <h3 className='text-lg font-bold text-gray-700'>
-                        Packaging Materials
-                      </h3>
-                      {costingData.packaging.map((p: any, index: number) => {
-                        return (
-                          <PackagingItem
-                            key={p.name}
-                            item={p}
-                            index={index}
-                            isPackExpanded={isPackExpanded}
-                            onToggle={() =>
-                              setPackIsExpanded(
-                                isPackExpanded === p.name ? null : p.name,
-                              )
-                            }
-                          />
-                        );
-                      })}
+                      <div className='flex items-center justify-between mb-3'>
+                        <h3 className='text-lg font-bold text-gray-700'>
+                          Packaging Materials
+                        </h3>
+                      </div>
+                      {costingData.packaging.map((p: any, index: number) => (
+                        <PackagingItem
+                          key={p.name}
+                          item={p}
+                          index={index}
+                          isComputed={true}
+                          isPackExpanded={isPackExpanded === p.name}
+                          onAddComponent={() =>
+                            setOpenAddPackagingComponent(true)
+                          }
+                          onToggle={() =>
+                            setPackIsExpanded(
+                              isPackExpanded === p.name ? null : p.name,
+                            )
+                          }
+                          onDelete={() => removePackagingItemHandler(p)}
+                          onDeleteComponent={(componentIndex) =>
+                            removePackagingComponentHandler(
+                              index,
+                              componentIndex,
+                            )
+                          }
+                        />
+                      ))}
+                      <div className='text-right'>
+                        <span className='text-xs text-gray-400 block uppercase font-medium'>
+                          Total Packaging Cost
+                        </span>
+
+                        <span className='text-lg font-bold text-gray-800'>
+                          {'\u20B1'}
+                          {formatNumber(
+                            costingData.packaging.reduce(
+                              (sum: number, item: any) =>
+                                sum +
+                                (Number(item.totalCost) +
+                                  Number(item.totalComponentCost) || 0),
+                              0,
+                            ),
+                            2,
+                          )}
+                        </span>
+                      </div>
                     </div>
                   </>
                 )}
+                {packagings &&
+                  !costingData &&
+                  packagings.map((p: any, index: number) => {
+                    return (
+                      <PackagingItem
+                        key={p.name}
+                        item={p}
+                        index={index}
+                        isComputed={false}
+                        isPackExpanded={isPackExpanded === p.name}
+                        onAddComponent={() =>
+                          setOpenAddPackagingComponent(true)
+                        }
+                        onToggle={() =>
+                          setPackIsExpanded(
+                            isPackExpanded === p.name ? null : p.name,
+                          )
+                        }
+                        onDelete={() => removePackagingItemHandler(index)}
+                        onDeleteComponent={(componentIndex) =>
+                          removePackagingComponentHandler(index, componentIndex)
+                        }
+                      />
+                    );
+                  })}
               </div>
             </div>
 

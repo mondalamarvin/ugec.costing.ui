@@ -4,6 +4,7 @@ import costingSlice from './slices/costingSlice';
 import formulaSlice from './slices/formulaSlice';
 import machineSlice from './slices/machineSlice';
 import materialSlice from './slices/materialSlice';
+import packagingSlice from './slices/packagingSlice';
 import processRoutes from './slices/processRouteSlice';
 
 const store = configureStore({
@@ -12,6 +13,7 @@ const store = configureStore({
     formula: formulaSlice,
     machine: machineSlice,
     material: materialSlice,
+    packaging: packagingSlice,
     processRoutes: processRoutes,
   },
 });

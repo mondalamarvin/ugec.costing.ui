@@ -25,4 +25,5 @@ export interface IInputErrors {
   material?: boolean;
   vehicle?: boolean;
   machineType?: boolean;
+  materialName?: boolean;
 }

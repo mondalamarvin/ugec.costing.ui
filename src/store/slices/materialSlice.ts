@@ -1,9 +1,9 @@
-import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { getMaterialsByCategoryRequest, getMaterialCategories } from "../api";
-import type { RootState } from "../store";
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { getMaterialsByCategoryRequest, getMaterialCategories } from '../api';
+import type { RootState } from '../store';
 
 export const fetchMaterialsByCategory = createAsyncThunk(
-  "materials/getMaterialsByCategoryRequest",
+  'materials/getMaterialsByCategoryRequest',
   async (category: number) => {
     const result = await getMaterialsByCategoryRequest(category);
     return result;
@@ -11,7 +11,7 @@ export const fetchMaterialsByCategory = createAsyncThunk(
 );
 
 export const fetchMaterialCategories = createAsyncThunk(
-  "materials/getMaterialCategories",
+  'materials/getMaterialCategories',
   async () => {
     const result = await getMaterialCategories();
     return result;
@@ -31,7 +31,7 @@ const initialState = {
 } as IState;
 
 const materialSlice = createSlice({
-  name: "material",
+  name: 'material',
   initialState,
   reducers: {
     resetMaterials(state) {
